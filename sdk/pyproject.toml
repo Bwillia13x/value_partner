@@ -1,6 +1,6 @@
 [project]
 name = "valueinvest_sdk"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Client SDK for Value Investing AI platform"
 readme = "README.md"
 authors = [{name="ValueInvest", email="support@example.com"}]
@@ -9,3 +9,11 @@ dependencies = ["requests>=2.32"]
 
 [project.urls]
 Homepage = "https://example.com"
+
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm[toml]>=7", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_scheme = "post-release"
+local_scheme = "no-local-version"
