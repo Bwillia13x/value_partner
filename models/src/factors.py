@@ -44,4 +44,19 @@ def compute_factors(df: pd.DataFrame) -> pd.DataFrame:
     z_scores = (out[numeric_cols] - out[numeric_cols].mean()) / out[numeric_cols].std(ddof=0)
     out["value_score"] = z_scores.mean(axis=1)
 
+    # Quality score: combination of high ROE and low leverage (debt-to-equity)
+    q_z = pd.DataFrame(
+        {
+            "roe": (out["roe"] - out["roe"].mean()) / out["roe"].std(ddof=0),
+            # Negative sign because lower debt is better
+            "de_ratio": -(
+                (out["de_ratio"] - out["de_ratio"].mean()) / out["de_ratio"].std(ddof=0)
+            ),
+        }
+    )
+    out["quality_score"] = q_z.mean(axis=1)
+
+    # Combined value + quality (Magic Formula-style ranking)
+    out["vq_score"] = (out["value_score"] + out["quality_score"]) / 2
+
     return out
