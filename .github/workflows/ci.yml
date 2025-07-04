@@ -34,6 +34,11 @@ jobs:
           isort --check .
           flake8
 
+      - name: Security scan (Bandit)
+        run: |
+          pip install bandit
+          bandit -q -r services models sdk data workbench
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -92,3 +97,21 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ghcr.io/${{ github.repository_owner }}/value-investing-api:latest
+
+  dependency_check:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency Check
+        uses: dependency-check/Dependency-Check_Action@v3.1.2
+        with:
+          project: "value-investing-platform"
+          path: "/workspace"
+          format: "HTML"
+          failOnCVSS: "7.0"
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: depcheck-report
+          path: ${{ github.workspace }}/reports

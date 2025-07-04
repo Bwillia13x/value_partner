@@ -27,3 +27,21 @@ spec:
               value: "{{ .Values.env.API_TIER }}"
           resources:
 {{ toYaml .Values.resources | indent 12 }}
+        {{- if .Values.loki.enabled }}
+        - name: promtail
+          image: "{{ .Values.loki.image }}"
+          args:
+            - "-config.file=/etc/promtail/promtail.yaml"
+          volumeMounts:
+            - name: promtail-config
+              mountPath: /etc/promtail
+            - name: varlog
+              mountPath: /var/log
+        {{- end }}
+      volumes:
+        - name: promtail-config
+          configMap:
+            name: {{ include "value-investing-api.fullname" . }}-promtail-config
+        - name: varlog
+          hostPath:
+            path: /var/log
