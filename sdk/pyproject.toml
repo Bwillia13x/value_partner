@@ -1,0 +1,11 @@
+[project]
+name = "valueinvest_sdk"
+version = "0.1.0"
+description = "Client SDK for Value Investing AI platform"
+readme = "README.md"
+authors = [{name="ValueInvest", email="support@example.com"}]
+requires-python = ">=3.9"
+dependencies = ["requests>=2.32"]
+
+[project.urls]
+Homepage = "https://example.com"
