@@ -21,7 +21,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt pre-commit mypy safety black isort flake8 pytest
+          pip install -r requirements.txt pre-commit mypy safety black isort flake8 pytest pytest-cov
           pre-commit --version
 
       - name: Run pre-commit checks
@@ -48,8 +48,8 @@ jobs:
       - name: Terraform validate
         run: terraform -chdir=infra validate
 
-      - name: Run tests
-        run: pytest -q
+      - name: Run tests with coverage
+        run: pytest --cov=. --cov-report=xml --cov-fail-under=80 -q
 
   trivy_scan:
     needs: build
