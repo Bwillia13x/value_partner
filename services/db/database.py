@@ -10,8 +10,12 @@ DB_NAME = os.getenv("POSTGRES_DB", "value_partner")
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}",
+    "sqlite:///./value_partner.db",
 )
+
+# Allow override to force Postgres via POSTGRES_FORCE env flag
+if os.getenv("POSTGRES_FORCE") == "1":
+    DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
