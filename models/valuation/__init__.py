@@ -9,6 +9,13 @@ from .magic_formula import magic_formula_rank
 from .ncav import ncav_ratio
 from .residual_income import residual_income_value
 from .graham import graham_number, margin_of_safety
+from .scores import (
+    piotroski_f_score,
+    beneish_m_score,
+    sloan_accruals_ratio,
+    altman_z_score,
+    cagr,
+)
 
 __all__ = [
     "discounted_cash_flow",
@@ -21,4 +28,9 @@ __all__ = [
     "graham_number",
     "residual_income_value",
     "margin_of_safety",
+    "piotroski_f_score",
+    "beneish_m_score",
+    "sloan_accruals_ratio",
+    "altman_z_score",
+    "cagr",
 ]
