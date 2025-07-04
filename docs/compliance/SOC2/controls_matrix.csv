@@ -1,0 +1,5 @@
+control_id,description,trust_service,owner,evidence,status,last_tested
+CC1.1,Control environment established,Security,CTO,Board minutes,DRAFT,
+CC6.1,Logical access controls,Security,SRE Team,Okta export,DRAFT,
+CC7.2,Change management,Availability,DevOps,Jenkins audit log,DRAFT,
+PI1.2,Data retention policy,Privacy,Legal,Policy doc,DRAFT,
