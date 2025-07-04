@@ -8,5 +8,6 @@ Proposed sub-folders:
 * `transform/` – dbt models or Spark notebooks that convert raw data to curated and feature layers.
 * `expectations/` – Great Expectations suites for automated data-quality validation.
 * `samples/` – very small CSV/Parquet files for unit-testing purposes only (do **not** commit licensed datasets).
+* `great_expectations/` – configuration and expectations suites for data-quality validation.
 
 > All ingestion jobs will be orchestrated via Airflow/Prefect in later phases and land data in the lakehouse bucket defined by Terraform.

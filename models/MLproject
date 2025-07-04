@@ -1,0 +1,13 @@
+name: value-investing-alpha
+
+python_env:
+  # A simple python environment definition; conda could be used later.
+  dependencies:
+    - pip:
+        - -r models/requirements.txt
+
+entry_points:
+  train:
+    parameters:
+      n_estimators: {type: int, default: 100}
+    command: "python train.py --n_estimators {n_estimators}"
