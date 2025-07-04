@@ -66,3 +66,17 @@ class SpecialSituation(Base):
     url = Column(String)
     data = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# -------------------- Research Notebook --------------------
+
+
+class ResearchNote(Base):
+    __tablename__ = "research_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String, index=True, nullable=False)
+    version = Column(Integer, nullable=False)
+    content = Column(String, nullable=False)
+    snapshot = Column(JSON)  # stores valuation snapshot etc
+    created_at = Column(DateTime, default=datetime.utcnow)

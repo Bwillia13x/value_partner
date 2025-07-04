@@ -19,7 +19,7 @@ st.set_page_config(page_title="Value Factors Workbench", layout="wide")
 st.title("📊 Value Investing Workbench")
 
 # Top-level tabs
-tab_names = ["Intrinsic Value", "EPV vs Asset Cost", "Quality Heatmap", "Data"]
+tab_names = ["Intrinsic Value", "EPV vs Asset Cost", "Quality Heatmap", "Research Notebook", "Data"]
 tabs = st.tabs(tab_names)
 
 # -----------------------------------------------------------------------
@@ -188,9 +188,52 @@ with tabs[2]:
         st.altair_chart(heat, use_container_width=True)
 
 # -----------------------------------------------------------------------
-# 4. Existing Data section moves to tabs[3]
+# 4. Research Notebook tab
 # -----------------------------------------------------------------------
+
 with tabs[3]:
+    import requests  # noqa: WPS433
+
+    st.header("📔 Research Notebook")
+    nb_symbol = st.text_input("Symbol", value="AAPL", key="nb_symbol")
+
+    # Fetch existing notes
+    if st.button("Load Notes"):
+        try:
+            resp = requests.get(f"http://localhost:8000/research/{nb_symbol.upper()}")
+            if resp.ok:
+                notes = resp.json()
+                if notes:
+                    versions = [n["version"] for n in notes]
+                    sel_version = st.selectbox("Version", versions)
+                    note = next(n for n in notes if n["version"] == sel_version)
+                    st.subheader(f"Version {sel_version} – {note['created_at']}")
+                    st.json(note["snapshot"], expanded=False)
+                    st.text_area("Content", note["content"], height=300)
+                else:
+                    st.info("No notes yet. Create the first one below.")
+        except Exception as exc:
+            st.error(f"Error fetching notes: {exc}")
+
+    st.subheader("Add / Update Note")
+    new_content = st.text_area("Your commentary", height=200, key="new_note")
+    if st.button("Save as new version"):
+        try:
+            resp = requests.post(
+                "http://localhost:8000/research/add",
+                json={"symbol": nb_symbol, "content": new_content},
+            )
+            if resp.ok:
+                st.success("Saved new research note version")
+            else:
+                st.error(resp.text)
+        except Exception as exc:
+            st.error(f"Error saving note: {exc}")
+
+# -----------------------------------------------------------------------
+# 5. Existing Data section moves to tabs[4]
+# -----------------------------------------------------------------------
+with tabs[4]:
     # Sidebar file selectors
     factor_file = st.sidebar.text_input("Factors file", value=str(FACTOR_PATH))
     backtest_file = st.sidebar.text_input("Backtest results", value=str(BACKTEST_PATH))
