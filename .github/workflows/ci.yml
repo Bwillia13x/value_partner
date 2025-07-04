@@ -21,7 +21,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install fastapi uvicorn black isort flake8 mlflow==2.11.0 great_expectations==0.18.12
+          pip install fastapi uvicorn black isort flake8 mlflow==2.11.0 great_expectations==0.18.12 pytest yfinance pyarrow
 
       - name: Run linters
         run: |
@@ -42,3 +42,33 @@ jobs:
 
       - name: Terraform validate
         run: terraform -chdir=infra validate
+
+      - name: Run tests
+        run: pytest -q
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/value-investing-api:latest

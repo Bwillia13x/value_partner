@@ -53,6 +53,11 @@ module "s3_lakehouse" {
   kms_key_arn    = module.kms_lakehouse.key_arn
 }
 
+module "iam_read_only" {
+  source               = "./modules/iam-basic"
+  lakehouse_bucket_arn = module.s3_lakehouse.bucket_arn
+}
+
 output "lakehouse_bucket" {
   description = "Name of the S3 bucket that backs the data lakehouse"
   value       = module.s3_lakehouse.bucket_name
