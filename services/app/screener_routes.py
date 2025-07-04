@@ -21,6 +21,8 @@ class ScreenerItem(BaseModel):
     price: float | None = None
     intrinsic_value: float | None = None
     magic_formula_score: float | None = None
+    ncav: float | None = None
+    z_score: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -120,3 +122,41 @@ def magic_formula(limit: int = 50, db: Session = Depends(get_session)):
             )
         )
     return result
+
+
+# ---------------------------------------------------------------------------
+# Klarman Distress / NCAV Screener
+# ---------------------------------------------------------------------------
+
+
+@router.get("/klarman", response_model=List[ScreenerItem])
+def klarman_ncav(limit: int = 50, db: Session = Depends(get_session)):
+    """Return stocks trading below 0.66 × NCAV and in distress Z-Score (<1.8)."""
+
+    rows = db.execute(select(KeyMetric)).scalars().all()
+    sym_data: dict[str, dict[str, float]] = {}
+    for k in rows:
+        sym_data.setdefault(k.symbol, {})[k.metric_name] = k.value or 0.0
+
+    results: List[ScreenerItem] = []
+    for sym, data in sym_data.items():
+        ncav = data.get("NCAV")  # assume per-share NCAV metric inserted elsewhere
+        price = data.get("price")
+        z = data.get("AltmanZ")
+        if (
+            ncav is not None and ncav > 0 and
+            price is not None and price < 0.66 * ncav and
+            z is not None and z < 1.8
+        ):
+            results.append(
+                ScreenerItem(
+                    symbol=sym,
+                    price=price,
+                    ncav=ncav,
+                    z_score=z,
+                )
+            )
+
+    # Sort by discount to NCAV descending
+    results.sort(key=lambda x: (x.price / x.ncav) if (x.price and x.ncav) else 1)
+    return results[:limit]
