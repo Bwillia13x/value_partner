@@ -4,6 +4,7 @@ from services.app.license import LicenseMiddleware
 from services.app.plugins import PLUGINS
 from services.app.valuation_routes import router as valuation_router
 from services.app.special_routes import router as special_router
+from services.app.screener_routes import router as screener_router
 
 try:
     from services.app.copilot import CopilotRetriever
@@ -67,3 +68,4 @@ async def run_plugin(req: PluginRequest):
 
 app.include_router(valuation_router)
 app.include_router(special_router)
+app.include_router(screener_router)
