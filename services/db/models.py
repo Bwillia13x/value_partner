@@ -51,3 +51,18 @@ class QualitativeSignal(Base):
     data = Column(JSON)
     as_of_date = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# -------------------- Special situations --------------------
+
+
+class SpecialSituation(Base):
+    __tablename__ = "special_situations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String, index=True, nullable=False)
+    filing_type = Column(String, nullable=False)
+    filed_at = Column(DateTime)
+    url = Column(String)
+    data = Column(JSON)
+    created_at = Column(DateTime, default=datetime.utcnow)

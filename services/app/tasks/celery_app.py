@@ -19,4 +19,9 @@ app.conf.beat_schedule = {
         "schedule": 60 * 60 * 24,  # every 24h
         "options": {"queue": "data_acquisition"},
     },
+    "special-situations-scan": {
+        "task": "services.app.tasks.special_situations.scan",
+        "schedule": 60 * 60 * 12,  # every 12h
+        "options": {"queue": "data_acquisition"},
+    },
 }
