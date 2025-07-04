@@ -21,7 +21,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install fastapi uvicorn black isort flake8 mlflow==2.11.0 great_expectations==0.18.12 pytest yfinance pyarrow jinja2 matplotlib streamlit shap sentence-transformers
+          pip install fastapi uvicorn black isort flake8 mlflow==2.11.0 great_expectations==0.18.12 pytest yfinance pyarrow jinja2 matplotlib streamlit shap sentence-transformers prefect deltalake
 
       - name: Run linters
         run: |
@@ -45,6 +45,20 @@ jobs:
 
       - name: Run tests
         run: pytest -q
+
+  trivy_scan:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Trivy
+        uses: aquasecurity/trivy-action@0.19.0
+        with:
+          scan-type: fs
+          ignore-unfixed: true
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          scanners: vuln
 
   docker:
     needs: build
@@ -71,4 +85,5 @@ jobs:
           context: .
           file: services/Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ghcr.io/${{ github.repository_owner }}/value-investing-api:latest
