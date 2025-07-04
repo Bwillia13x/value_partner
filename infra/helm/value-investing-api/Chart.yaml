@@ -1,0 +1,10 @@
+apiVersion: v2
+name: value-investing-api
+description: Helm chart for Value Investing FastAPI microservice
+version: 0.1.0
+appVersion: 0.1.0
+type: application
+dependencies:
+  - name: postgresql
+    version: 12.6.6
+    repository: https://charts.bitnami.com/bitnami
