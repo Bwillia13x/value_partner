@@ -8,3 +8,5 @@ Current scope (Phase 1):
 3. Modular structure for future Glue, Athena, Redshift, EMR, and security resources.
 
 > Every change must go through pull-request review and pass the CI pipeline (`terraform fmt`, `terraform validate`, and plan review) before being merged.
+
+- **KMS key** – customer-managed key with rotation enabled (module `kms_lakehouse`).

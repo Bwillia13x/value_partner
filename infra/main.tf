@@ -33,12 +33,24 @@ variable "lakehouse_bucket_name" {
   default     = "my-lakehouse-bucket"
 }
 
+variable "kms_key_alias" {
+  type        = string
+  description = "Alias for the KMS key used to encrypt lakehouse data"
+  default     = "lakehouse-key"
+}
+
 # -------------------------------------------------------------------
 #  Data-Lakehouse Foundation
 # -------------------------------------------------------------------
+module "kms_lakehouse" {
+  source = "./modules/kms"
+  alias  = var.kms_key_alias
+}
+
 module "s3_lakehouse" {
   source         = "./modules/s3-lakehouse"
   bucket_name    = var.lakehouse_bucket_name
+  kms_key_arn    = module.kms_lakehouse.key_arn
 }
 
 output "lakehouse_bucket" {
