@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from services.app.license import LicenseMiddleware
 from services.app.plugins import PLUGINS
+from services.app.valuation_routes import router as valuation_router
 
 try:
     from services.app.copilot import CopilotRetriever
@@ -62,3 +63,5 @@ async def run_plugin(req: PluginRequest):
         return {"result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+app.include_router(valuation_router)
