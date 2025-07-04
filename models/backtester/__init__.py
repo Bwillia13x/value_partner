@@ -1,0 +1,1 @@
+"""Simple vectorized backtesting utilities for factor strategies."""
