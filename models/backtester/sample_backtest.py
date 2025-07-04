@@ -13,6 +13,7 @@ import pandas as pd
 
 from models.src.factors import compute_factors  # type: ignore
 from models.backtester.backtester import Backtester
+from models.analytics.gips import gips_metrics  # local import to avoid circular
 
 
 def synthetic_data(n_months: int = 36):
@@ -48,12 +49,20 @@ def main():
     df = synthetic_data(args.months)
     bt = Backtester("vq_score", n_quantiles=5)
     cum_returns = bt.run(df)
+
+    period_returns = df.groupby("date")["return"].mean()
+    gips = gips_metrics(period_returns)
+
     stats = bt.performance_stats(cum_returns["Q1"])
 
     print("Cumulative returns quantiles:")
     print(cum_returns.tail())
     print("\nPerformance stats (Q1):")
     for k, v in stats.items():
+        print(f"{k}: {v:.3%}")
+
+    print("\nGIPS metrics (composite):")
+    for k, v in gips.items():
         print(f"{k}: {v:.3%}")
 
     # Save output for compliance/reporting
