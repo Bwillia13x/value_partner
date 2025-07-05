@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
-from app.database import get_db, User
-from app.portfolio_routes import sync_user_data
+from .database import get_db, User
+from .portfolio_routes import sync_user_data
 import hashlib
 import hmac
 import json

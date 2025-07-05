@@ -6,9 +6,9 @@ from celery import shared_task
 from sqlalchemy.orm import Session
 import sys, types
 
-from app.database import get_db
-from app.integrations import get_plaid_service
-from app.integrations import get_alpaca_service
+from ..database import get_db
+from ..integrations import get_plaid_service
+from ..integrations import get_alpaca_service
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +106,7 @@ if 'celery' not in sys.modules:
 # ---------------------------------------------------------------------------
 # Additional wrappers when running tests even if real Celery is installed
 # ---------------------------------------------------------------------------
+import os
 TESTING_MODE = 'pytest' in sys.modules or os.getenv('TESTING') == '1'
 if TESTING_MODE:
     def _wrap_sync(fn, bind: bool = False):
@@ -136,7 +137,7 @@ if TESTING_MODE:
         reconcile_all_accounts = _wrap_sync(reconcile_all_accounts, bind=False)  # type: ignore
 
 try:
-    from app.database import Account, Holding  # type: ignore
+    from ..database import Account, Holding  # type: ignore
 except ImportError:
     # Fallback: define minimal stubs so tests run
     class _Dummy:  # type: ignore

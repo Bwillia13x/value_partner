@@ -5,43 +5,43 @@ load_dotenv()
 import uuid
 from fastapi import FastAPI, HTTPException, status, Request
 from pydantic import BaseModel
-from app.license import LicenseMiddleware
+from .license import LicenseMiddleware
 import os
-from app.plugins import PLUGINS
-from app.portfolio_routes import router as portfolio_router
-from app.webhooks import router as webhooks_router
-from app.strategy_routes import router as strategy_router
-from app.analytics_routes import router as analytics_router
-from app.optimizer_routes import router as optimizer_router
-from app.reporting_routes import router as reporting_router
-from app.notifications_routes import router as notifications_router
-from app.auth_routes import router as auth_router
-from app.order_routes import router as order_router
-from app.tax_routes import router as tax_router
-from app.market_data_routes import router as market_data_router
-from app.integrations.plaid_routes import router as plaid_router
+from .plugins import PLUGINS
+from .portfolio_routes import router as portfolio_router
+from .webhooks import router as webhooks_router
+from .strategy_routes import router as strategy_router
+from .analytics_routes import router as analytics_router
+from .optimizer_routes import router as optimizer_router
+from .reporting_routes import router as reporting_router
+from .notifications_routes import router as notifications_router
+from .auth_routes import router as auth_router
+from .order_routes import router as order_router
+from .tax_routes import router as tax_router
+from .market_data_routes import router as market_data_router
+from .integrations.plaid_routes import router as plaid_router
 # from app.task_routes import router as task_router # Removed for debugging
-from app.unified_account_routes import router as unified_account_router
-from app.monitoring_routes import router as monitoring_router
-from app.websocket_routes import router as websocket_router
-from app.beta_testing_routes import router as beta_router
-from app.database import init_db
+from .unified_account_routes import router as unified_account_router
+from .monitoring_routes import router as monitoring_router
+from .websocket_routes import router as websocket_router
+from .beta_testing_routes import router as beta_router
+from .database import init_db
 from celery import current_app as current_celery_app
 from pathlib import Path
 import pandas as pd
 import logging
 from datetime import datetime
-from app.logging_config import setup_logging
-from app.performance_monitor import performance_monitor
-from app.csrf_protection import CSRFProtectionMiddleware
-from app.monitoring import start_monitoring, track_http_request, app_monitor
-from app.real_time_sync import start_real_time_sync
+from .logging_config import setup_logging
+from .performance_monitor import performance_monitor
+from .csrf_protection import CSRFProtectionMiddleware
+from .monitoring import start_monitoring, track_http_request, app_monitor
+from .real_time_sync import start_real_time_sync
 
 # Initialize structured logging
 logger = setup_logging()
 
 try:
-    from app.copilot import CopilotRetriever
+    from .copilot import CopilotRetriever
 
     retriever = CopilotRetriever()
 except Exception:
@@ -171,7 +171,7 @@ async def startup_event():
     
     # Start market data manager
     try:
-        from app.market_data import market_data_manager
+        from .market_data import market_data_manager
         market_data_manager.start()
         logger.info("Market data manager started successfully")
     except Exception as e:
@@ -179,7 +179,7 @@ async def startup_event():
     
     # Create a test task to verify Celery is working
     try:
-        from app.tasks.reconciliation import reconcile_all_accounts
+        from .tasks.reconciliation import reconcile_all_accounts
         result = reconcile_all_accounts.delay()
         logger.info(f"Test Celery task enqueued with ID: {result.id}")
     except Exception as e:
@@ -206,8 +206,8 @@ async def health_check():
 @app.get("/health/detailed", include_in_schema=False)
 async def detailed_health_check():
     """Comprehensive health check endpoint that verifies all services"""
-    from app.error_handling import error_handler
-    from app.database import get_db
+    from .error_handling import error_handler
+    from .database import get_db
     import time
     
     health_results = {

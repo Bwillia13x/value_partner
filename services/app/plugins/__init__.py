@@ -21,7 +21,7 @@ def load_plugins() -> Dict[str, Callable[[dict], dict]]:
         pass
     # add built-in example plugin
     try:
-        from app.plugins import example_plugin
+        from . import example_plugin
 
         plugins["example_plugin"] = example_plugin.predict
     except Exception:

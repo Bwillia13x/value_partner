@@ -84,7 +84,7 @@ except ImportError:
     class status:
         HTTP_401_UNAUTHORIZED = 401
 
-from services.app.database import get_db, User  # type: ignore
+from .database import get_db, User  # type: ignore
 
 
 def _resolve_db(db_session):
