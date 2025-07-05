@@ -1,0 +1,11 @@
+services/venv/
+*.db
+__pycache__/
+*.pyc
+*.egg-info/
+workbench/__pycache__/
+*.log
+test_external_api.py
+test_logging.py
+tests/__pycache__/
+
