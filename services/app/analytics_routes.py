@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Dict, List
 from datetime import datetime, timedelta
 from .database import get_db, User
-from .auth_routes import get_current_user
+from .auth import get_current_active_user # Changed from auth_routes to auth
 from .analytics import PortfolioAnalytics
 from pydantic import BaseModel
 

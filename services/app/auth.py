@@ -68,64 +68,55 @@ def verify_token(token: str) -> Optional[dict]:
         # jose throws multiple exception classes; we don't need granularity here for tests
         return None
 
-# --- Helpers for FastAPI-style dependency injection used in tests ---
-from contextlib import contextmanager
-from types import GeneratorType
-
-try:
-    from fastapi import HTTPException, status
-except ImportError:
-    # Provide minimal stubs so we don't add a hard dependency on FastAPI for unit tests
-    class HTTPException(Exception):
-        def __init__(self, status_code: int, detail: str):
-            self.status_code = status_code
-            self.detail = detail
-
-    class status:
-        HTTP_401_UNAUTHORIZED = 401
+# --- Helpers for FastAPI-style dependency injection ---
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session # Added
+from types import GeneratorType # Added
 
 from services.app.database import get_db, User  # type: ignore
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token") # Relative to app root
 
-def _resolve_db(db_session):
+def _resolve_db(db_session, db_dependency: Session = Depends(get_db)): # Added db_dependency
     """Return a usable DB session from either injected argument or default dependency."""
     if db_session is not None:
         return db_session
-
-    # get_db is a generator dependency
-    db_gen = get_db()
-    if isinstance(db_gen, GeneratorType):
-        db = next(db_gen)
-        return db
-    return db_gen
+    return db_dependency
 
 
-def get_current_user(token: str, db_session=None):
-    """Retrieve the current user based on the supplied JWT *token*.
-
-    Mimics FastAPI's dependency signature so tests can call it directly.
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)): # Modified
     """
+    Retrieve the current user based on the supplied JWT token from OAuth2PasswordBearer.
+    This is intended for use as a FastAPI dependency.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     payload = verify_token(token)
     if not payload:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise credentials_exception
 
-    username = payload.get("sub")
-    if not username:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Token missing 'sub'")
+    username_or_email = payload.get("sub")
+    if username_or_email is None:
+        raise credentials_exception
 
-    db = _resolve_db(db_session)
+    # db = _resolve_db(db_session, db) # db is already resolved by Depends(get_db)
 
-    if hasattr(User, "username"):
-        user = db.query(User).filter((User.username == username) | (User.email == username)).first()
-    else:
-        user = db.query(User).filter(User.email == username).first()
-    if not user:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if hasattr(User, "username"): # Check if User model has a username field
+        user = db.query(User).filter((User.username == username_or_email) | (User.email == username_or_email)).first()
+    else: # Fallback to email only if no username field
+        user = db.query(User).filter(User.email == username_or_email).first()
+
+    if user is None:
+        raise credentials_exception
     return user
 
 
-def get_current_active_user(current_user):
-    """Ensure that *current_user* is active, raising if not."""
-    if getattr(current_user, "is_active", False):
-        return current_user
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
+async def get_current_active_user(current_user: User = Depends(get_current_user)): # Modified
+    """Ensure that current_user is active, raising if not."""
+    if not getattr(current_user, "is_active", True): # Default to True if is_active is not present, or check its value
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+    return current_user

@@ -37,6 +37,13 @@ from app.csrf_protection import CSRFProtectionMiddleware
 from app.monitoring import start_monitoring, track_http_request, app_monitor
 from app.real_time_sync import start_real_time_sync
 
+# Rate Limiting
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+
 # Initialize structured logging
 logger = setup_logging()
 
@@ -61,9 +68,12 @@ app = FastAPI(
     on_startup=[],
     on_shutdown=[]
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add request tracing and monitoring middleware
 @app.middleware("http")
+@limiter.limit() # Apply rate limit to all requests here
 async def request_tracing_middleware(request: Request, call_next):
     """Add request tracing, correlation ID, and monitoring to all requests"""
     request_id = str(uuid.uuid4())

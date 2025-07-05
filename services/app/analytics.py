@@ -282,12 +282,14 @@ class PortfolioAnalytics:
             holdings = self.db.query(Holding).filter(Holding.account_id == account.id).all()
             
             for holding in holdings:
-                if holding.symbol and holding.cost_basis:
-                    # Calculate contribution to total return
+                if holding.symbol and holding.cost_basis is not None and holding.cost_basis != 0: # Guard against zero cost_basis
                     current_return = (holding.market_value - holding.cost_basis) / holding.cost_basis
-                    weight = holding.market_value / self.get_current_portfolio_value(user_id)
-                    contribution = current_return * weight
                     
-                    attribution[holding.symbol] = contribution
+                    current_portfolio_value = self.get_current_portfolio_value(user_id)
+                    if current_portfolio_value != 0: # Guard against zero portfolio value
+                        weight = holding.market_value / current_portfolio_value
+                        contribution = current_return * weight
+                        attribution[holding.symbol] = contribution
+                    # else: contribution might be considered 0 or handled as per requirements if portfolio value is 0
         
         return attribution

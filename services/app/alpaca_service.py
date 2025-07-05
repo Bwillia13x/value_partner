@@ -8,6 +8,7 @@ from alpaca_trade_api import REST, TimeFrame
 from alpaca_trade_api.rest import APIError
 from datetime import datetime, timedelta
 import alpaca_trade_api as tradeapi
+from .error_handling import retry_api_call, error_handler, ErrorCategory, ErrorContext # Added
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,18 +40,27 @@ class AlpacaService:
         if not self.api:
             return False
         try:
-            account = self.api.get_account()
+            # Decorate the actual API call for retry
+            @retry_api_call
+            def _get_alpaca_account_status():
+                return self.api.get_account()
+
+            account = _get_alpaca_account_status()
             return account is not None
-        except Exception as e:
-            logger.error(f"Alpaca connection check failed: {e}")
+        except Exception: # Catch any exception after retries from _get_alpaca_account_status
+            # Logger call is already in retry_api_call via error_handler.record_error
             return False
-    
+
+    @retry_api_call
+    def _get_account_api(self) -> tradeapi.entity.Account:
+        if not self.api: raise ConnectionError("Alpaca API client not initialized.")
+        return self.api.get_account()
+
     def get_account(self) -> Optional[Dict]:
         """Get account information"""
-        if not self.api:
-            return None
         try:
-            account = self.api.get_account()
+            account = self._get_account_api()
+            if not account: return None # Should be handled by retry raising if it's critical
             return {
                 "id": account.id,
                 "account_number": account.account_number,
@@ -82,14 +92,20 @@ class AlpacaService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         except Exception as e:
             logger.error(f"Error getting account: {e}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get account")
+            # The retry decorator would have already logged via error_handler.
+            # This specific log might be redundant or could be for a final unhandled error.
+            # For now, keeping the HTTPException translation.
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get account information after retries.")
     
+    @retry_api_call
+    def _list_positions_api(self) -> List[tradeapi.entity.Position]:
+        if not self.api: raise ConnectionError("Alpaca API client not initialized.")
+        return self.api.list_positions()
+
     def get_positions(self) -> List[Dict]:
         """Get current positions"""
-        if not self.api:
-            return []
         try:
-            positions = self.api.list_positions()
+            positions = self._list_positions_api()
             return [
                 {
                     "symbol": pos.symbol,
@@ -114,19 +130,45 @@ class AlpacaService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         except Exception as e:
             logger.error(f"Error getting positions: {e}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get positions")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get positions after retries.")
     
+    @retry_api_call
+    def _submit_order_api(self, symbol: str, qty: float, side: str, order_type: str,
+                          time_in_force: str, limit_price: Optional[float],
+                          stop_price: Optional[float], trail_percent: Optional[float],
+                          trail_price: Optional[float], extended_hours: bool,
+                          client_order_id: Optional[str]) -> tradeapi.entity.Order:
+        if not self.api: raise ConnectionError("Alpaca API client not initialized.")
+        return self.api.submit_order(
+            symbol=symbol,
+            qty=qty,
+            side=side,
+            type=order_type, # Alpaca SDK uses 'type' for order_type
+            time_in_force=time_in_force,
+            limit_price=limit_price,
+            stop_price=stop_price,
+            trail_percent=trail_percent,
+            trail_price=trail_price,
+            extended_hours=extended_hours,
+            client_order_id=client_order_id
+        )
+
     def submit_order(self, symbol: str, qty: float, side: str, order_type: str = "market", 
                      time_in_force: str = "day", limit_price: Optional[float] = None,
                      stop_price: Optional[float] = None, trail_percent: Optional[float] = None,
                      trail_price: Optional[float] = None, extended_hours: bool = False,
                      client_order_id: Optional[str] = None) -> Dict:
         """Submit an order to Alpaca"""
+        # The initial `if not self.api:` check is implicitly handled by _submit_order_api if it raises ConnectionError.
+        # However, if the API was None from the start, it's better to fail fast.
         if not self.api:
+            # This specific HTTPException won't be retried by a decorator on submit_order itself.
+            # The _submit_order_api (if called) would be retried for other network/API errors.
+            error_handler.record_error(ConnectionError("Alpaca API not available at submission time"), ErrorCategory.EXTERNAL_API, ErrorSeverity.CRITICAL, ErrorContext(function_name="submit_order"))
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Alpaca API not available")
-        
+
         try:
-            order = self.api.submit_order(
+            order = self._submit_order_api(
                 symbol=symbol,
                 qty=qty,
                 side=side,
@@ -183,14 +225,18 @@ class AlpacaService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         except Exception as e:
             logger.error(f"Error submitting order: {e}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to submit order")
-    
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to submit order after retries.")
+
+    @retry_api_call
+    def _get_order_api(self, order_id: str) -> tradeapi.entity.Order:
+        if not self.api: raise ConnectionError("Alpaca API client not initialized.")
+        return self.api.get_order(order_id)
+
     def get_order(self, order_id: str) -> Optional[Dict]:
         """Get order by ID"""
-        if not self.api:
-            return None
         try:
-            order = self.api.get_order(order_id)
+            order = self._get_order_api(order_id)
+            if not order: return None # Should be handled by retry if critical
             return {
                 "id": order.id,
                 "client_order_id": order.client_order_id,
@@ -213,35 +259,57 @@ class AlpacaService:
             }
         except APIError as e:
             logger.error(f"Alpaca API error getting order: {e}")
+            # Let retry handler propagate or translate in calling service.
+            # Consider if specific APIError for "not found" should return None vs raise.
+            # For now, if _get_order_api raises, it propagates.
+            # If it returns None (though Alpaca client usually raises for not found), this handles it.
             return None
-        except Exception as e:
-            logger.error(f"Error getting order: {e}")
+        except Exception as e: # Catch-all after retries
+            logger.error(f"Generic error getting order {order_id} after retries: {e}")
             return None
-    
+
+    @retry_api_call
+    def _cancel_order_api(self, order_id: str): # Alpaca SDK cancel_order returns None on success
+        if not self.api: raise ConnectionError("Alpaca API client not initialized.")
+        self.api.cancel_order(order_id) # Raises APIError on failure (e.g., already cancelled, not found)
+
     def cancel_order(self, order_id: str) -> bool:
-        """Cancel an order"""
-        if not self.api:
-            return False
+        """Cancel an order. Returns True on success, False on specific API errors like 'order not cancelable' or 'not found' after retries."""
         try:
-            self.api.cancel_order(order_id)
+            self._cancel_order_api(order_id)
             return True
-        except APIError as e:
-            logger.error(f"Alpaca API error canceling order: {e}")
+        except APIError as e: # Specific Alpaca errors after retries
+            logger.warning(f"Alpaca API error canceling order {order_id} after retries: {e} (will return False)")
+            # These are "graceful" failures from Alpaca's perspective (e.g. order already filled)
+            # The error_handler in retry_api_call would have logged it.
             return False
-        except Exception as e:
-            logger.error(f"Error canceling order: {e}")
+        except Exception as e: # Other unexpected errors after retries
+            logger.error(f"Unexpected error canceling order {order_id} after retries: {e} (will return False)")
             return False
     
+    @retry_api_call
+    def _list_orders_api(self, status: Optional[str], limit: int,
+                        after: Optional[datetime], until: Optional[datetime],
+                        direction: str, nested: bool) -> List[tradeapi.entity.Order]:
+        if not self.api: raise ConnectionError("Alpaca API client not initialized.")
+        return self.api.list_orders(
+            status=status,
+            limit=limit,
+            after=after,
+            until=until,
+            direction=direction,
+            nested=nested
+        )
+
     def get_orders(self, status: Optional[str] = None, limit: int = 100, 
                    after: Optional[datetime] = None, until: Optional[datetime] = None,
                    direction: str = "desc", nested: bool = True) -> List[Dict]:
         """Get orders"""
-        if not self.api:
-            return []
         try:
-            orders = self.api.list_orders(
-                status=status,
-                limit=limit,
+            orders = self._list_orders_api(status, limit, after, until, direction, nested)
+            return [
+                {
+                    "id": order.id,
                 after=after,
                 until=until,
                 direction=direction,

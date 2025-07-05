@@ -30,16 +30,26 @@ def compute_factors(df: pd.DataFrame) -> pd.DataFrame:
 
     out = df.copy()
 
-    # Earnings yield is inverse of P/E
-    out["earnings_yield"] = 1 / out["pe_ratio"]
+    # --- Basic Value Factors ---
+    # Note: These are common factors. A production system would include a much wider array,
+    # potentially including: Price/Sales, Price/Cash Flow, FCF Yield, Dividend Yield, etc.
+    # The composite scores below are also for demonstration and can be significantly enhanced.
 
-    # Book-to-market is inverse of Price-to-Book
-    out["book_to_market"] = 1 / out["pb_ratio"]
+    # Earnings yield is inverse of P/E. Handle potential zero P/E.
+    # P/E can be negative if earnings are negative; earnings_yield will also be negative.
+    # If P/E is zero (e.g. no earnings, or data issue), yield could be infinite or error.
+    # We'll replace inf with NaN, which won't contribute to mean scores.
+    out["earnings_yield"] = np.where(out["pe_ratio"] == 0, np.nan, 1 / out["pe_ratio"])
 
-    # EV/EBITDA inverted to represent cheaper values higher
-    out["ev_ebitda_inverse"] = 1 / out["ev_ebitda"]
 
-    # Composite value score: simple z-score average for demo
+    # Book-to-market is inverse of Price-to-Book. Handle potential zero P/B.
+    out["book_to_market"] = np.where(out["pb_ratio"] == 0, np.nan, 1 / out["pb_ratio"])
+
+    # EV/EBITDA inverted to represent cheaper values higher. Handle potential zero EV/EBITDA.
+    out["ev_ebitda_inverse"] = np.where(out["ev_ebitda"] == 0, np.nan, 1 / out["ev_ebitda"])
+
+    # Composite value score: simple z-score average for demo.
+    # Future enhancements: rank-based scores, industry-neutralization, outlier handling.
     numeric_cols = ["earnings_yield", "book_to_market", "ev_ebitda_inverse"]
     z_scores = (out[numeric_cols] - out[numeric_cols].mean()) / out[numeric_cols].std(ddof=0)
     out["value_score"] = z_scores.mean(axis=1)

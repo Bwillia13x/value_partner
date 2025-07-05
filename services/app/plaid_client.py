@@ -13,6 +13,7 @@ from plaid.api_client import ApiClient
 from datetime import datetime, timedelta
 import os
 from typing import List, Dict, Any
+from .error_handling import retry_api_call # Import the decorator
 
 class PlaidClient:
     def __init__(self):
@@ -45,6 +46,7 @@ class PlaidClient:
         api_client = ApiClient(configuration)
         self.client = plaid_api.PlaidApi(api_client)
     
+    @retry_api_call
     def create_link_token(self, user_id: str, user_name: str) -> Dict[str, Any]:
         """Create a link token for Plaid Link initialization"""
         request = LinkTokenCreateRequest(
@@ -60,6 +62,7 @@ class PlaidClient:
         response = self.client.link_token_create(request)
         return response.to_dict()
     
+    @retry_api_call
     def exchange_public_token(self, public_token: str) -> Dict[str, Any]:
         """Exchange public token for access token"""
         request = ItemPublicTokenExchangeRequest(
@@ -69,12 +72,14 @@ class PlaidClient:
         response = self.client.item_public_token_exchange(request)
         return response.to_dict()
     
+    @retry_api_call
     def get_accounts(self, access_token: str) -> List[Dict[str, Any]]:
         """Get all accounts for a user"""
         request = AccountsGetRequest(access_token=access_token)
         response = self.client.accounts_get(request)
         return [account.to_dict() for account in response['accounts']]
     
+    @retry_api_call
     def get_transactions(self, access_token: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """Get transactions for a date range"""
         request = TransactionsGetRequest(
@@ -86,12 +91,14 @@ class PlaidClient:
         response = self.client.transactions_get(request)
         return [transaction.to_dict() for transaction in response['transactions']]
     
+    @retry_api_call
     def get_holdings(self, access_token: str) -> List[Dict[str, Any]]:
         """Get investment holdings"""
         request = InvestmentsHoldingsGetRequest(access_token=access_token)
         response = self.client.investments_holdings_get(request)
         return [holding.to_dict() for holding in response['holdings']]
     
+    # get_recent_transactions uses get_transactions, which is already decorated. No need to decorate this one separately.
     def get_recent_transactions(self, access_token: str, days: int = 30) -> List[Dict[str, Any]]:
         """Get recent transactions"""
         end_date = datetime.now()
