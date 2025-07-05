@@ -12,7 +12,6 @@ import {
   Legend,
   Filler,
   TooltipItem,
-  Tick,
 } from "chart.js";
 
 ChartJS.register(

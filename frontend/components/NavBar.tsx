@@ -22,7 +22,6 @@ import {
   Wallet,
   DollarSign,
   Building,
-  Globe
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -527,7 +526,7 @@ export default function NavBar() {
                   
                   {searchQuery && (
                     <div className="mt-4 space-y-2">
-                      <p className="text-sm text-gray-500">Search results for "{searchQuery}"</p>
+                      <p className="text-sm text-gray-500">Search results for &quot;{searchQuery}&quot;</p>
                       <div className="space-y-1">
                         <div className="p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                           <p className="font-medium">Apple Inc. (AAPL)</p>

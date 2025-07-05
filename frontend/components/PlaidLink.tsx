@@ -32,7 +32,7 @@ export default function PlaidLink({ userId, onSuccess, onError }: PlaidLinkProps
         setLinkToken(data.link_token)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to initialize Plaid')
-        onError?.(err)
+        if (onError) onError(err)
       } finally {
         setLoading(false)
       }
@@ -55,7 +55,7 @@ export default function PlaidLink({ userId, onSuccess, onError }: PlaidLinkProps
       //     onSuccess(public_token)
       //   },
       //   onExit: (err, metadata) => {
-      //     if (err) onError?.(err)
+      //     if (err && onError) onError(err)
       //   }
       // })
       // linkHandler.open()
@@ -64,7 +64,7 @@ export default function PlaidLink({ userId, onSuccess, onError }: PlaidLinkProps
       alert('In a real implementation, this would open Plaid Link to connect your bank account.')
       
     } catch (err) {
-      onError?.(err)
+      if (onError) onError(err)
     }
   }
 

@@ -1,16 +1,13 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { 
   ShoppingCart,
   TrendingUp,
   TrendingDown,
-  DollarSign,
-  Clock,
   AlertTriangle,
-  CheckCircle,
   XCircle,
   BarChart3,
   Target,
@@ -18,12 +15,6 @@ import {
   Zap,
   Wallet,
   Search,
-  Filter,
-  Settings,
-  Info,
-  Plus,
-  Minus,
-  Activity,
   RefreshCcw
 } from 'lucide-react'
 import { cn, formatCurrency, formatPercentage, debounce } from '@/lib/utils'
@@ -108,9 +99,9 @@ export function TradingInterface({
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [searchResults, setSearchResults] = useState<SecurityQuote[]>([])
   const [recentOrders, setRecentOrders] = useState<Order[]>([])
-  const [currentPositions, setCurrentPositions] = useState<Position[]>([])
-  const [accountBalance, setAccountBalance] = useState<number>(0)
-  const [buyingPower, setBuyingPower] = useState<number>(0)
+  const [currentPositions] = useState<Position[]>([])
+  const [accountBalance] = useState<number>(0)
+  const [buyingPower] = useState<number>(0)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [orderValidation, setOrderValidation] = useState<{
     isValid: boolean
@@ -118,7 +109,7 @@ export function TradingInterface({
     warnings: string[]
   }>({ isValid: true, errors: [], warnings: [] })
 
-  const { register, handleSubmit, formState: { errors }, watch, setValue, reset } = useForm()
+  const { handleSubmit, setValue, reset } = useForm()
 
   const orderTypes: OrderType[] = [
     {
@@ -189,11 +180,6 @@ export function TradingInterface({
     }
   }, [quote, orderType, setValue])
 
-  // Validate order
-  useEffect(() => {
-    validateOrder()
-  }, [quantity, limitPrice, stopPrice, orderType, orderSide, quote, buyingPower])
-
   const fetchQuoteData = async (symbol: string) => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/market/quote/${symbol}`)
@@ -218,7 +204,7 @@ export function TradingInterface({
     }
   }
 
-  const validateOrder = () => {
+  const validateOrder = useCallback(() => {
     const errors: string[] = []
     const warnings: string[] = []
 
@@ -236,7 +222,15 @@ export function TradingInterface({
       return
     }
 
-    const estimatedValue = getEstimatedOrderValue()
+    // Calculate estimated value inline
+    let estimatedValue = 0
+    if (quote && quantity) {
+      let price = quote.price
+      if (orderType === 'LIMIT' && limitPrice > 0) {
+        price = limitPrice
+      }
+      estimatedValue = quantity * price
+    }
 
     if (orderSide === 'BUY') {
       if (estimatedValue > buyingPower) {
@@ -277,9 +271,14 @@ export function TradingInterface({
       errors,
       warnings
     })
-  }
+  }, [selectedSymbol, quantity, quote, orderSide, buyingPower, accountBalance, orderType, limitPrice, stopPrice, currentPositions])
 
-  const getEstimatedOrderValue = (): number => {
+  // Validate order
+  useEffect(() => {
+    validateOrder()
+  }, [validateOrder])
+
+  const getEstimatedOrderValue = useCallback((): number => {
     if (!quote || !quantity) return 0
     
     let price = quote.price
@@ -291,7 +290,7 @@ export function TradingInterface({
     const commission = 0 // Assuming commission-free trading
     
     return value + commission
-  }
+  }, [quote, quantity, orderType, limitPrice])
 
   const handleSymbolSelect = (symbol: string) => {
     setSelectedSymbol(symbol)
@@ -299,7 +298,7 @@ export function TradingInterface({
     setSearchResults([])
   }
 
-  const handleOrderSubmit = async (data: any) => {
+  const handleOrderSubmit = async () => {
     if (!orderValidation.isValid) return
 
     setIsLoading(true)
@@ -539,7 +538,7 @@ export function TradingInterface({
                         type="button"
                         variant={orderType === type.id ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setOrderType(type.id as any)}
+                        onClick={() => setOrderType(type.id as 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT')}
                         className="justify-start"
                       >
                         {type.icon}
@@ -618,7 +617,7 @@ export function TradingInterface({
                   <label className="form-label">Time in Force</label>
                   <select
                     value={timeInForce}
-                    onChange={(e) => setTimeInForce(e.target.value as any)}
+                    onChange={(e) => setTimeInForce(e.target.value as 'DAY' | 'GTC' | 'IOC' | 'FOK')}
                     className="form-input w-full"
                   >
                     <option value="DAY">Day</option>

@@ -5,13 +5,12 @@ import { motion } from 'framer-motion'
 import { TrendingUp, AlertTriangle, Shield, Zap } from 'lucide-react'
 import { TradingInterface } from '../../components/trading/TradingInterface'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
-import { Button } from '../../components/ui/Button'
 
 export default function TradingPage() {
   const [userId] = useState(1) // In real app, get from auth context
   const [paperTradingMode, setPaperTradingMode] = useState(true)
 
-  const handleOrderSubmit = async (order: any) => {
+  const handleOrderSubmit = async (order: Record<string, unknown>) => {
     console.log('Order submitted:', order)
     // In a real app, this would submit to your trading API
   }

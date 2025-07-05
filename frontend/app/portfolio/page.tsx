@@ -1,24 +1,20 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { 
   TrendingUp, 
   BarChart3, 
   PieChart, 
   Activity, 
-  Settings, 
   AlertTriangle,
   Loader2,
-  Plus,
-  Download,
   RefreshCcw
 } from 'lucide-react'
 import PlaidLink from '../../components/PlaidLink'
 import { RealTimeDashboard } from '../../components/dashboard/RealTimeDashboard'
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
-import { cn } from '@/lib/utils'
 
 interface AccountSetupProps {
   userId: number
@@ -76,7 +72,7 @@ function AccountSetup({ userId, onSuccess }: AccountSetupProps) {
             </motion.div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Connecting Your Account</h2>
             <p className="text-gray-600 mb-4">
-              We're securely connecting your bank account and syncing your data...
+              We&apos;re securely connecting your bank account and syncing your data...
             </p>
             <div className="space-y-2 text-sm text-gray-500">
               <div className="flex items-center justify-center space-x-2">
@@ -203,7 +199,7 @@ interface PortfolioLoadingProps {
   onRetry: () => void
 }
 
-function PortfolioLoading({ onRetry }: PortfolioLoadingProps) {
+function PortfolioLoading({ }: PortfolioLoadingProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -269,7 +265,7 @@ function PortfolioError({ onRetry }: PortfolioLoadingProps) {
           </motion.div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Unable to Load Portfolio</h2>
           <p className="text-gray-600 mb-6">
-            We're having trouble loading your portfolio data. Please check your connection and try again.
+            We&apos;re having trouble loading your portfolio data. Please check your connection and try again.
           </p>
           <Button onClick={onRetry} className="w-full">
             <RefreshCcw className="h-4 w-4 mr-2" />
@@ -289,9 +285,9 @@ export default function PortfolioPage() {
 
   useEffect(() => {
     checkForAccounts()
-  }, [userId])
+  }, [userId, checkForAccounts])
 
-  const checkForAccounts = async () => {
+  async function checkForAccounts() {
     try {
       setLoading(true)
       setError(null)

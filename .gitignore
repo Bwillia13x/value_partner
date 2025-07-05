@@ -1,4 +1,7 @@
 services/venv/
+# Ignore environment files containing secrets
+services/.env
+services/.env.*
 *.db
 __pycache__/
 *.pyc

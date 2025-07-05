@@ -11,10 +11,8 @@ import {
   BarChart3, 
   LineChart, 
   CandlestickChart,
-  Volume2,
   Maximize2,
   Download,
-  Settings
 } from 'lucide-react'
 
 export interface ChartDataPoint {
@@ -58,14 +56,13 @@ export function AdvancedChart({
 }: AdvancedChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const seriesRef = useRef<ISeriesApi<any> | null>(null)
-  const volumeSeriesRef = useRef<ISeriesApi<any> | null>(null)
+  const seriesRef = useRef<ISeriesApi<'Line'> | null>(null)
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [chartType, setChartType] = useState(config.type)
-  const [timeRange, setTimeRange] = useState('1D')
 
   useEffect(() => {
-    if (!chartContainerRef.current || loading) return
+    if (!chartContainerRef.current) return
 
     // Create chart
     const chart = createChart(chartContainerRef.current, {
@@ -106,7 +103,6 @@ export function AdvancedChart({
       },
       timeScale: {
         borderColor: config.theme === 'dark' ? '#374151' : '#e5e7eb',
-        textColor: config.theme === 'dark' ? '#d1d5db' : '#374151',
         timeVisible: true,
         secondsVisible: false,
       },
@@ -124,7 +120,7 @@ export function AdvancedChart({
     chartRef.current = chart
 
     // Create main series based on chart type
-    let series: ISeriesApi<any>
+    let series: any
     
     switch (chartType) {
       case 'line':
@@ -257,7 +253,7 @@ export function AdvancedChart({
       window.removeEventListener('resize', handleResize)
       chart.remove()
     }
-  }, [data, config, chartType, loading])
+  }, [data, config, chartType])
 
   // Real-time updates
   useEffect(() => {
@@ -485,7 +481,6 @@ export function ComparisonChart({
 } & Partial<AdvancedChartProps>) {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!chartContainerRef.current || datasets.length === 0) return

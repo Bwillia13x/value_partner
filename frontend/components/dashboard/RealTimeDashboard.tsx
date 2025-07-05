@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import useWebSocket, { ReadyState } from 'react-use-websocket'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -10,22 +10,18 @@ import {
   DollarSign,
   PieChart,
   BarChart3,
-  Users,
   AlertTriangle,
-  Zap,
   RefreshCcw,
   Wifi,
   WifiOff,
-  Bell,
   Settings,
-  Maximize2,
   Filter,
   Download
 } from 'lucide-react'
 import { cn, formatCurrency, formatPercentage, getPercentageColor } from '@/lib/utils'
-import { Card, CardContent, CardHeader, CardTitle, MetricCard, PerformanceCard } from '@/components/ui/Card'
+import { Card, CardContent, CardHeader, CardTitle, MetricCard } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { AdvancedChart, PortfolioChart, StockChart, ChartDataPoint } from '@/components/charts/AdvancedChart'
+import { PortfolioChart, ChartDataPoint } from '@/components/charts/AdvancedChart'
 
 interface PortfolioData {
   totalValue: number
@@ -110,15 +106,101 @@ export function RealTimeDashboard({
   enableNotifications = true
 }: RealTimeDashboardProps) {
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null)
-  const [marketOverview, setMarketOverview] = useState<MarketOverview | null>(null)
+  const [, setMarketOverview] = useState<MarketOverview | null>(null)
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
-  const [selectedTimeframe, setSelectedTimeframe] = useState('1D')
+  const [selectedTimeframe] = useState('1D')
   const [isLoading, setIsLoading] = useState(true)
   const [notifications, setNotifications] = useState<Alert[]>([])
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [selectedView, setSelectedView] = useState<'overview' | 'positions' | 'analytics'>('overview')
+
+  // Define callback functions with useCallback to prevent unnecessary re-renders
+  const fetchInitialData = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      const [portfolioResponse, chartResponse] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/portfolio/summary?user_id=${userId}`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/portfolio/chart?user_id=${userId}&timeframe=${selectedTimeframe}`)
+      ])
+
+      if (portfolioResponse.ok) {
+        const portfolioData = await portfolioResponse.json()
+        setPortfolioData(portfolioData)
+      }
+
+      if (chartResponse.ok) {
+        const chartData = await chartResponse.json()
+        setChartData(chartData)
+      }
+    } catch (error) {
+      console.error('Error fetching initial data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [userId, selectedTimeframe])
+
+  const handleNewAlert = useCallback((alert: Alert) => {
+    setNotifications(prev => [alert, ...prev.slice(0, 9)]) // Keep only 10 latest
+    
+    if (enableNotifications && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification(alert.title, {
+          body: alert.message,
+          icon: '/favicon.ico',
+          tag: alert.id
+        })
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification(alert.title, {
+              body: alert.message,
+              icon: '/favicon.ico',
+              tag: alert.id
+            })
+          }
+        })
+      }
+    }
+  }, [enableNotifications])
+
+  const updatePositionPrices = useCallback((priceUpdates: { [symbol: string]: number }) => {
+    setPortfolioData(prev => {
+      if (!prev) return prev
+      
+      const updatedPositions = prev.positions.map(position => {
+        const newPrice = priceUpdates[position.symbol]
+        if (newPrice) {
+          const newMarketValue = position.quantity * newPrice
+          const newUnrealizedPL = newMarketValue - position.costBasis
+          const newUnrealizedPLPercent = (newUnrealizedPL / position.costBasis) * 100
+          
+          return {
+            ...position,
+            currentPrice: newPrice,
+            marketValue: newMarketValue,
+            unrealizedPL: newUnrealizedPL,
+            unrealizedPLPercent: newUnrealizedPLPercent,
+            lastUpdate: new Date().toISOString()
+          }
+        }
+        return position
+      })
+
+      const newTotalValue = updatedPositions.reduce((sum, pos) => sum + pos.marketValue, 0) + prev.cashBalance
+      const newTotalChange = newTotalValue - (prev.totalValue - prev.totalChange)
+      const newTotalChangePercent = ((newTotalValue - (prev.totalValue - prev.totalChange)) / (prev.totalValue - prev.totalChange)) * 100
+
+      return {
+        ...prev,
+        positions: updatedPositions,
+        totalValue: newTotalValue,
+        totalChange: newTotalChange,
+        totalChangePercent: newTotalChangePercent
+      }
+    })
+  }, [])
 
   // WebSocket connection
   const { sendMessage, lastMessage, readyState } = useWebSocket(
@@ -161,7 +243,7 @@ export function RealTimeDashboard({
         console.error('Error parsing WebSocket message:', error)
       }
     }
-  }, [lastMessage])
+  }, [lastMessage, handleNewAlert, updatePositionPrices])
 
   // Request initial data when connected
   useEffect(() => {
@@ -176,7 +258,7 @@ export function RealTimeDashboard({
   // Fetch initial data
   useEffect(() => {
     fetchInitialData()
-  }, [userId])
+  }, [fetchInitialData])
 
   // Auto-refresh data
   useEffect(() => {
@@ -194,92 +276,8 @@ export function RealTimeDashboard({
     }, refreshInterval)
 
     return () => clearInterval(interval)
-  }, [autoRefresh, readyState, sendMessage, userId, refreshInterval])
+  }, [autoRefresh, readyState, sendMessage, userId, refreshInterval, fetchInitialData])
 
-  const fetchInitialData = async () => {
-    try {
-      setIsLoading(true)
-      const [portfolioResponse, chartResponse] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/portfolio/summary?user_id=${userId}`),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/portfolio/chart?user_id=${userId}&timeframe=${selectedTimeframe}`)
-      ])
-
-      if (portfolioResponse.ok) {
-        const portfolioData = await portfolioResponse.json()
-        setPortfolioData(portfolioData)
-      }
-
-      if (chartResponse.ok) {
-        const chartData = await chartResponse.json()
-        setChartData(chartData)
-      }
-    } catch (error) {
-      console.error('Error fetching initial data:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleNewAlert = (alert: Alert) => {
-    setNotifications(prev => [alert, ...prev.slice(0, 9)]) // Keep only 10 latest
-    
-    if (enableNotifications && 'Notification' in window) {
-      if (Notification.permission === 'granted') {
-        new Notification(alert.title, {
-          body: alert.message,
-          icon: '/favicon.ico',
-          tag: alert.id
-        })
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-          if (permission === 'granted') {
-            new Notification(alert.title, {
-              body: alert.message,
-              icon: '/favicon.ico',
-              tag: alert.id
-            })
-          }
-        })
-      }
-    }
-  }
-
-  const updatePositionPrices = (priceUpdates: { [symbol: string]: number }) => {
-    setPortfolioData(prev => {
-      if (!prev) return prev
-      
-      const updatedPositions = prev.positions.map(position => {
-        const newPrice = priceUpdates[position.symbol]
-        if (newPrice) {
-          const newMarketValue = position.quantity * newPrice
-          const newUnrealizedPL = newMarketValue - position.costBasis
-          const newUnrealizedPLPercent = (newUnrealizedPL / position.costBasis) * 100
-          
-          return {
-            ...position,
-            currentPrice: newPrice,
-            marketValue: newMarketValue,
-            unrealizedPL: newUnrealizedPL,
-            unrealizedPLPercent: newUnrealizedPLPercent,
-            lastUpdate: new Date().toISOString()
-          }
-        }
-        return position
-      })
-
-      const newTotalValue = updatedPositions.reduce((sum, pos) => sum + pos.marketValue, 0) + prev.cashBalance
-      const newTotalChange = newTotalValue - (prev.totalValue - prev.totalChange)
-      const newTotalChangePercent = ((newTotalValue - (prev.totalValue - prev.totalChange)) / (prev.totalValue - prev.totalChange)) * 100
-
-      return {
-        ...prev,
-        positions: updatedPositions,
-        totalValue: newTotalValue,
-        totalChange: newTotalChange,
-        totalChangePercent: newTotalChangePercent
-      }
-    })
-  }
 
   const connectionStatusColor = useMemo(() => {
     switch (connectionStatus) {
@@ -446,7 +444,7 @@ export function RealTimeDashboard({
             key={tab.id}
             variant={selectedView === tab.id ? 'default' : 'ghost'}
             size="sm"
-            onClick={() => setSelectedView(tab.id as any)}
+            onClick={() => setSelectedView(tab.id as 'overview' | 'positions' | 'analytics')}
             className="flex-1"
           >
             <tab.icon className="h-4 w-4 mr-2" />
@@ -643,7 +641,7 @@ export function RealTimeDashboard({
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {sectorAllocation.map((sector, index) => (
+                      {sectorAllocation.map((sector) => (
                         <div key={sector.sector}>
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm font-medium">{sector.sector}</span>
