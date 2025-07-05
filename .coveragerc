@@ -1,0 +1,5 @@
+[run]
+omit =
+    */tests/*
+    */services/alembic/*
+    */services/migrations/*

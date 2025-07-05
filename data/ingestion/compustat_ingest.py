@@ -7,11 +7,8 @@ Sends request to fetch fundamentals for tickers and writes Parquet.
 from __future__ import annotations
 
 import argparse
-import os
-import sys
 from pathlib import Path
 
-import pandas as pd
 
 from data.providers.compustat_provider import CompustatProvider
 

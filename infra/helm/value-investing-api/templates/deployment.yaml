@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "value-investing-api.fullname" . }}
+  labels:
+    app: {{ include "value-investing-api.name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "value-investing-api.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "value-investing-api.name" . }}
+    spec:
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: "{{- if .Values.env.DATABASE_URL }}{{ .Values.env.DATABASE_URL }}{{- else }}postgresql://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ include "value-investing-api.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}{{- end }}"
+            - name: API_TIER
+              value: "{{ .Values.env.API_TIER }}"
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+        {{- if .Values.loki.enabled }}
+        - name: promtail
+          image: "{{ .Values.loki.image }}"
+          args:
+            - "-config.file=/etc/promtail/promtail.yaml"
+          volumeMounts:
+            - name: promtail-config
+              mountPath: /etc/promtail
+            - name: varlog
+              mountPath: /var/log
+        {{- end }}
+      volumes:
+        - name: promtail-config
+          configMap:
+            name: {{ include "value-investing-api.fullname" . }}-promtail-config
+        - name: varlog
+          hostPath:
+            path: /var/log

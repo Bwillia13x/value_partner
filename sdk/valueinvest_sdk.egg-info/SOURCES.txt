@@ -1,0 +1,9 @@
+pyproject.toml
+setup.py
+valueinvest_sdk/__init__.py
+valueinvest_sdk/client.py
+valueinvest_sdk.egg-info/PKG-INFO
+valueinvest_sdk.egg-info/SOURCES.txt
+valueinvest_sdk.egg-info/dependency_links.txt
+valueinvest_sdk.egg-info/requires.txt
+valueinvest_sdk.egg-info/top_level.txt

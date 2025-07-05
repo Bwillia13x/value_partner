@@ -7,11 +7,9 @@ Prerequisites: run `train_ensemble.py` first and ensure MLflow tracking URI is s
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import mlflow
-import numpy as np
 import pandas as pd
 import shap
 

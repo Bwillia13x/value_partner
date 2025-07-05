@@ -1,0 +1,82 @@
+{"asctime": "2025-07-04 08:51:33,443", "name": "services.app", "levelname": "ERROR", "message": "Database connection failed", "component": "database", "error_type": "connection_timeout", "retry_count": 3, "user_id": 789}
+2025-07-04 08:52:23,150 - services.app - ERROR - Test database error
+2025-07-04 08:52:47,956 - services.app - ERROR - Error message
+2025-07-04 08:55:12,568 - services.app.error_handling - ERROR - Error recorded [external_api_1751640912560] external_api: (sqlite3.OperationalError) no such column: users.hashed_password
+[SQL: SELECT users.id AS users_id, users.email AS users_email, users.hashed_password AS users_hashed_password, users.name AS users_name, users.created_at AS users_created_at, users.updated_at AS users_updated_at, users.plaid_access_token AS users_plaid_access_token, users.plaid_item_id AS users_plaid_item_id 
+FROM users 
+WHERE users.id = ?
+ LIMIT ? OFFSET ?]
+[parameters: (123, 1, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-07-04 10:49:41,685 - services.app - ERROR - Error enqueueing test Celery task: cannot import name 'get_alpaca_service' from 'app.integrations' (/Users/benjaminwilliams/value_partner/services/app/integrations/__init__.py)
+2025-07-04 11:20:26,144 - services.app - ERROR - Error enqueueing test Celery task: cannot import name 'get_alpaca_service' from 'app.integrations' (/Users/benjaminwilliams/value_partner/services/app/integrations/__init__.py)
+2025-07-04 11:31:23,777 - services.app - ERROR - Error enqueueing test Celery task: cannot import name 'get_alpaca_service' from 'app.integrations' (/Users/benjaminwilliams/value_partner/services/app/integrations/__init__.py)
+2025-07-04 11:31:28,367 - services.app - ERROR - Error enqueueing test Celery task: cannot import name 'get_alpaca_service' from 'app.integrations' (/Users/benjaminwilliams/value_partner/services/app/integrations/__init__.py)
+2025-07-04 11:31:42,773 - services.app - ERROR - Error enqueueing test Celery task: cannot import name 'get_alpaca_service' from 'app.integrations' (/Users/benjaminwilliams/value_partner/services/app/integrations/__init__.py)
+2025-07-04 11:32:34,055 - services.app - ERROR - Error enqueueing test Celery task: cannot import name 'get_alpaca_service' from 'app.integrations' (/Users/benjaminwilliams/value_partner/services/app/integrations/__init__.py)
+2025-07-04 11:32:47,955 - services.app - ERROR - Error enqueueing test Celery task: cannot import name 'get_alpaca_service' from 'app.integrations' (/Users/benjaminwilliams/value_partner/services/app/integrations/__init__.py)
+2025-07-04 15:00:44,508 - services.app - ERROR - Error message
+2025-07-04 16:19:02,546 - services.app - ERROR - Error message
+2025-07-04 16:20:01,688 - services.app - ERROR - Error message
+2025-07-04 16:21:23,265 - services.app - ERROR - Error message
+2025-07-04 16:21:24,151 - services.app - ERROR - Request failed: (sqlite3.OperationalError) no such column: users.hashed_password
+[SQL: SELECT users.id AS users_id, users.email AS users_email, users.hashed_password AS users_hashed_password, users.name AS users_name, users.created_at AS users_created_at, users.updated_at AS users_updated_at, users.plaid_access_token AS users_plaid_access_token, users.plaid_item_id AS users_plaid_item_id 
+FROM users 
+WHERE users.email = ?
+ LIMIT ? OFFSET ?]
+[parameters: ('test***@***.example.com', 1, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-07-04 16:21:24,489 - services.app - ERROR - Request failed: (sqlite3.OperationalError) no such column: users.hashed_password
+[SQL: SELECT users.id AS users_id, users.email AS users_email, users.hashed_password AS users_hashed_password, users.name AS users_name, users.created_at AS users_created_at, users.updated_at AS users_updated_at, users.plaid_access_token AS users_plaid_access_token, users.plaid_item_id AS users_plaid_item_id 
+FROM users 
+WHERE users.email = ?
+ LIMIT ? OFFSET ?]
+[parameters: ('test***@***.example.com', 1, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-07-04 16:21:24,785 - services.app - ERROR - Request failed: (sqlite3.OperationalError) no such column: users.hashed_password
+[SQL: SELECT users.id AS users_id, users.email AS users_email, users.hashed_password AS users_hashed_password, users.name AS users_name, users.created_at AS users_created_at, users.updated_at AS users_updated_at, users.plaid_access_token AS users_plaid_access_token, users.plaid_item_id AS users_plaid_item_id 
+FROM users 
+WHERE users.email = ?
+ LIMIT ? OFFSET ?]
+[parameters: ('test***@***.example.com', 1, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-07-04 16:23:46,543 - services.app - ERROR - Request failed: (sqlite3.ProgrammingError) SQLite objects created in a thread can only be used in that same thread. The object was created in thread id 6304067584 and this is thread id 6320893952.
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-07-04 16:23:46,974 - services.app - ERROR - Error message
+2025-07-04 16:26:44,798 - services.app - ERROR - Error message
+2025-07-04 16:28:58,705 - services.app - ERROR - Error message
+2025-07-04 16:34:04,511 - services.app - ERROR - Error message
+2025-07-04 16:34:05,630 - services.app - ERROR - Request failed: (sqlite3.OperationalError) attempt to write a readonly database
+[SQL: INSERT INTO users (email, hashed_password, name, created_at, updated_at, plaid_access_token, plaid_item_id) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?) RETURNING id, created_at, updated_at]
+[parameters: ('test***@***.example.com', '$2b$12$71/kA67bRLx24fnmXcjKge8v/lhNL1bOJ8W7W8z3DkWO1ShPwlY..', None, None, None)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-07-04 16:34:06,237 - services.app - ERROR - Request failed: (sqlite3.OperationalError) attempt to write a readonly database
+[SQL: INSERT INTO users (email, hashed_password, name, created_at, updated_at, plaid_access_token, plaid_item_id) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?) RETURNING id, created_at, updated_at]
+[parameters: ('test***@***.example.com', '$2b$12$KvweNPlSg2Hp6x.badycU.AqT85qGu9Ydo8NESGf5PesL1YyQ4w6a', None, None, None)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-07-04 16:34:06,841 - services.app - ERROR - Request failed: (sqlite3.OperationalError) attempt to write a readonly database
+[SQL: INSERT INTO users (email, hashed_password, name, created_at, updated_at, plaid_access_token, plaid_item_id) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?) RETURNING id, created_at, updated_at]
+[parameters: ('test***@***.example.com', '$2b$12$bLjbVCZaTJIO7lgInOPMr.lr28eM/6LxysRHJSYF2UeA4LcXRc3gG', None, None, None)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-07-04 16:37:24,220 - services.app - ERROR - Error message
+2025-07-04 16:40:11,426 - services.app - ERROR - Error message
+2025-07-04 17:02:42,371 - services.app - ERROR - Error message
+2025-07-04 17:09:27,764 - services.app - ERROR - Error message
+2025-07-04 17:10:17,739 - services.app - ERROR - Error message
+2025-07-04 17:10:59,429 - services.app - ERROR - Error message
+2025-07-04 17:11:30,995 - services.app - ERROR - Error message
+2025-07-04 17:12:03,066 - services.app - ERROR - Error message
+2025-07-04 17:12:43,268 - services.app - ERROR - Error message
+2025-07-04 17:13:38,126 - services.app - ERROR - Error message
+2025-07-04 17:15:46,669 - services.app - ERROR - Error message
+2025-07-04 17:16:14,117 - services.app - ERROR - Error message
+2025-07-04 17:16:50,437 - services.app - ERROR - Error message
+2025-07-04 17:17:59,651 - services.app - ERROR - Error message
+2025-07-04 17:18:38,487 - services.app - ERROR - Error message
+2025-07-04 17:24:27,475 - services.app - ERROR - Error message
+2025-07-04 17:25:33,198 - services.app - ERROR - Error message
+2025-07-04 17:26:50,790 - services.app - ERROR - Error message
+2025-07-04 17:27:24,816 - services.app - ERROR - Error message
+2025-07-04 17:28:07,148 - services.app - ERROR - Error message
+2025-07-04 17:30:24,792 - services.app - ERROR - Error message
+2025-07-04 17:31:18,562 - services.app - ERROR - Error message

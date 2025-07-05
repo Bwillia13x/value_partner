@@ -9,7 +9,17 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import mlflow
+try:
+    import mlflow  # type: ignore
+except ImportError:  # pragma: no cover – provide no-op stub
+    class _MLFlowStub:
+        def __getattr__(self, item):
+            # Return callable no-op to swallow any mlflow calls used in script
+            def _no_op(*args, **kwargs):
+                return None
+            return _no_op
+    mlflow = _MLFlowStub()  # type: ignore
+
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, StackingRegressor
