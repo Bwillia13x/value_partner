@@ -1,75 +1,20 @@
-from dotenv import load_dotenv
-load_dotenv(dotenv_path='services/.env')
-
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from services.app.main import app
-from services.app.database import Base, get_db
-from services.app import crud, auth, schemas, auth_routes
+"""Test strategies functionality with proper test isolation."""
 import pytest
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base.metadata.create_all(bind=engine)
-
-def override_get_db():
-    try:
-        db = TestingSessionLocal()
-        yield db
-    finally:
-        db.close()
-
-app.dependency_overrides[get_db] = override_get_db
-
-
-
-@pytest.fixture(scope="function")
-def db_session():
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-@pytest.fixture(scope="function")
-def authenticated_client(db_session):
-    app.dependency_overrides.update({get_db: lambda: db_session})
-    test_client = TestClient(app)
-
-    # Create a test user
-    user_data = schemas.UserCreate(email="test@example.com", password="testpassword", name="Test User")
-    hashed_password = auth.get_password_hash(user_data.password)
-    user = crud.create_user(db_session, user=user_data, hashed_password=hashed_password)
-    db_session.flush()
-    db_session.refresh(user)
-
-    # Obtain an access token
-    token_response = test_client.post(
-        "/auth/token",
-        data={
-            "username": user.email,
-            "password": user_data.password
-        }
-    )
-    access_token = token_response.json()["access_token"]
-    headers = {"Authorization": f"Bearer {access_token}"}
-    yield TestClient(app, headers=headers)
-    app.dependency_overrides.clear()
-
 def test_create_strategy(authenticated_client):
+    """Test creating a new strategy."""
     response = authenticated_client.post(
         "/strategies/",
-        json={"name": "Growth", "description": "Growth strategy", "holdings": [{"symbol": "AAPL", "target_weight": 0.5}, {"symbol": "GOOG", "target_weight": 0.5}]},
+        json={
+            "name": "Growth", 
+            "description": "Growth strategy", 
+            "holdings": [
+                {"symbol": "AAPL", "target_weight": 0.5}, 
+                {"symbol": "GOOG", "target_weight": 0.5}
+            ]
+        },
     )
-    assert response.status_code == 200, response.text
+    assert response.status_code == 200, f"Strategy creation failed: {response.text}"
     data = response.json()
     assert data["name"] == "Growth"
     assert len(data["holdings"]) == 2
@@ -77,28 +22,95 @@ def test_create_strategy(authenticated_client):
     assert data["holdings"][1]["symbol"] == "GOOG"
 
 def test_read_strategies(authenticated_client):
-    authenticated_client.post(
+    """Test reading strategies - this was the failing test due to lack of isolation."""
+    # First, verify no strategies exist initially (fresh database per test)
+    initial_response = authenticated_client.get("/strategies/")
+    assert initial_response.status_code == 200
+    initial_data = initial_response.json()
+    assert len(initial_data) == 0, f"Expected 0 strategies initially, found {len(initial_data)}"
+    
+    # Create a strategy
+    create_response = authenticated_client.post(
         "/strategies/",
-        json={"name": "Growth", "description": "Growth strategy", "holdings": [{"symbol": "AAPL", "target_weight": 0.5}, {"symbol": "GOOG", "target_weight": 0.5}]},
+        json={
+            "name": "Growth", 
+            "description": "Growth strategy", 
+            "holdings": [
+                {"symbol": "AAPL", "target_weight": 0.5}, 
+                {"symbol": "GOOG", "target_weight": 0.5}
+            ]
+        },
     )
+    assert create_response.status_code == 200, f"Strategy creation failed: {create_response.text}"
+    
+    # Now verify we have exactly 1 strategy
     response = authenticated_client.get("/strategies/")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
+    assert len(data) == 1, f"Expected exactly 1 strategy, found {len(data)}"
     assert data[0]["name"] == "Growth"
 
 def test_rebalance_strategy(authenticated_client):
+    """Test strategy rebalancing functionality."""
     # Create a strategy
     strategy_response = authenticated_client.post(
         "/strategies/",
-        json={"name": "Value", "description": "Value strategy", "holdings": [{"symbol": "MSFT", "target_weight": 1.0}]},
+        json={
+            "name": "Value", 
+            "description": "Value strategy", 
+            "holdings": [{"symbol": "MSFT", "target_weight": 1.0}]
+        },
     )
+    assert strategy_response.status_code == 200, f"Strategy creation failed: {strategy_response.text}"
     strategy_id = strategy_response.json()["id"]
 
-    # In a real test, you would add some holdings to the test database here
-
+    # Test rebalancing the strategy
     response = authenticated_client.post(f"/strategies/{strategy_id}/rebalance")
     assert response.status_code == 200
     data = response.json()
     assert "proposed_trades" in data
     assert "executed_trades" in data
+
+
+def test_multiple_strategies_isolation(authenticated_client):
+    """Test that multiple strategy operations work with proper isolation."""
+    # Create first strategy
+    response1 = authenticated_client.post(
+        "/strategies/",
+        json={
+            "name": "Growth Strategy", 
+            "description": "Growth focused", 
+            "holdings": [{"symbol": "AAPL", "target_weight": 1.0}]
+        },
+    )
+    assert response1.status_code == 200
+    
+    # Create second strategy
+    response2 = authenticated_client.post(
+        "/strategies/",
+        json={
+            "name": "Value Strategy", 
+            "description": "Value focused", 
+            "holdings": [{"symbol": "MSFT", "target_weight": 1.0}]
+        },
+    )
+    assert response2.status_code == 200
+    
+    # Verify we have exactly 2 strategies
+    list_response = authenticated_client.get("/strategies/")
+    assert list_response.status_code == 200
+    strategies = list_response.json()
+    assert len(strategies) == 2, f"Expected exactly 2 strategies, found {len(strategies)}"
+    
+    strategy_names = [s["name"] for s in strategies]
+    assert "Growth Strategy" in strategy_names
+    assert "Value Strategy" in strategy_names
+
+
+def test_strategy_isolation_between_tests(authenticated_client):
+    """Test that this test starts with a clean database (no strategies from previous tests)."""
+    # This test should always start with 0 strategies due to proper isolation
+    response = authenticated_client.get("/strategies/")
+    assert response.status_code == 200
+    strategies = response.json()
+    assert len(strategies) == 0, f"Expected 0 strategies due to test isolation, found {len(strategies)}"

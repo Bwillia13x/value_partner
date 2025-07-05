@@ -78,6 +78,7 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=True)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     name = Column(String)
@@ -286,7 +287,11 @@ class Transaction(Base):
 def get_db():
     # For in-memory SQLite, each new connection may need the schema
     if "pytest" in sys.modules or os.getenv("TESTING") == "1":
-        Base.metadata.drop_all(bind=engine)
+        # Ensure schema exists for the in-memory SQLite used during tests.
+        # Avoid dropping the tables on every new connection because it wipes
+        # data created earlier within the same test (e.g. users created before
+        # calling the /auth/token endpoint). Re-creating the schema if it does
+        # not yet exist is enough.
         Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:

@@ -12,20 +12,128 @@ from app.integrations import get_alpaca_service
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Celery fallback stub for test environments (when Celery is not installed)
+# ---------------------------------------------------------------------------
 try:
     from celery import shared_task  # type: ignore
-except ImportError:  # pragma: no cover – lightweight fallback
-    def shared_task(*args, **kwargs):  # type: ignore
+except ImportError:  # pragma: no cover – provide lightweight in-process stub
+    import types
+    from functools import wraps
+
+    class _DummyTaskSelf:  # Minimal mimic of Celery Task instance used during tests
+        def __init__(self):
+            self.request = types.SimpleNamespace(retries=0)
+            self.max_retries = 0
+
+        def retry(self, exc: Exception | None = None, *args, **kwargs):  # noqa: D401
+            """Mimic Celery's ``self.retry`` by simply re-raising the provided exception.
+
+            The real Celery implementation wraps the exception to signal a retry. In
+            our synchronous test stub we can propagate the original exception so the
+            test surfaces any unexpected errors instead of failing with
+            ``AttributeError``.
+            """
+            if exc is not None:
+                raise exc
+            # If no exception passed, raise a generic RuntimeError to emulate behavior
+            raise RuntimeError("Task retry requested")
+
+    class _TaskStub:
+        """Callable object that mimics a Celery Task instance."""
+        def __init__(self, fn):
+            self._fn = fn
+            self.run = fn  # direct access like real Celery
+            wraps(fn)(self)
+
+        # Support calling like a normal function (drop the `self` arg expected when bind=True)
+        def __call__(self, *args, **kwargs):  # noqa: D401
+            """Invoke the wrapped task synchronously.
+
+            If the original task was declared with ``bind=True`` then the first
+            parameter in its signature will be *self*. In that case we insert a
+            dummy *self* object. Otherwise we call it directly with the provided
+            args.
+            """
+            import inspect
+            sig = inspect.signature(self._fn)
+            params = list(sig.parameters.values())
+            if params and params[0].name in {"self", "task_self"}:
+                return self._fn(_DummyTaskSelf(), *args, **kwargs)
+            return self._fn(*args, **kwargs)
+
+        # Support `.apply()` used in tests
+        def apply(self, args=None, kwargs=None):  # noqa: D401
+            args = args or()
+            kwargs = kwargs or{}
+            return self._fn(_DummyTaskSelf(), *args, **kwargs)
+
+        # Support `.delay()` similar to `.apply()` for convenience
+        def delay(self, *args, **kwargs):  # noqa: D401
+            return self._fn(_DummyTaskSelf(), *args, **kwargs)
+
+    import inspect
+
+    def _wrap_function(fn):
+        """Return TaskStub for a given function."""
+        return _TaskStub(fn)
+
+    def shared_task(*dargs, **dkwargs):  # type: ignore
+        """Replacement for Celery's @shared_task decorator (test mode).
+
+        Handles the following usages:
+        1. `@shared_task` (no parentheses)
+        2. `@shared_task()` (empty parentheses)
+        3. `@shared_task(bind=True, ..., name="foo")`
+        """
+        # Case 1: used without parentheses -> first arg is the function
+        if dargs and callable(dargs[0]) and len(dargs) == 1 and not dkwargs:
+            return _wrap_function(dargs[0])
+
+        # Otherwise we are called with options and must return a decorator
         def decorator(fn):
-            return fn
+            return _wrap_function(fn)
+
         return decorator
 
-# If Celery not installed, inject stub module so other imports succeed
+# If Celery not installed or we are in TESTING mode, inject stub module so other imports succeed
 if 'celery' not in sys.modules:
     celery_stub = types.ModuleType('celery')
     celery_stub.shared_task = shared_task  # type: ignore
     celery_stub.current_app = None  # type stub
     sys.modules['celery'] = celery_stub
+
+# ---------------------------------------------------------------------------
+# Additional wrappers when running tests even if real Celery is installed
+# ---------------------------------------------------------------------------
+TESTING_MODE = 'pytest' in sys.modules or os.getenv('TESTING') == '1'
+if TESTING_MODE:
+    def _wrap_sync(fn, bind: bool = False):
+        """Return a sync callable that mimics a Celery Task with apply/delay."""
+        def _call(*args, **kwargs):
+            if bind:
+                return fn(_DummyTaskSelf(), *args, **kwargs)  # type: ignore[arg-type]
+            return fn(*args, **kwargs)
+        def _apply(args=None, kwargs=None):
+            return _call(*(args or ()), **(kwargs or {}))
+        _call.apply = _apply  # type: ignore[attr-defined]
+        _call.delay = _apply  # type: ignore[attr-defined]
+        return _call
+
+    # Replace task objects with synchronous wrappers so direct calls work.
+    try:
+        reconcile_account  # defined below via decorator
+    except NameError:
+        pass
+    else:
+        reconcile_account = _wrap_sync(reconcile_account, bind=True)  # type: ignore
+
+    try:
+        reconcile_all_accounts  # defined below
+    except NameError:
+        pass
+    else:
+        reconcile_all_accounts = _wrap_sync(reconcile_all_accounts, bind=False)  # type: ignore
 
 try:
     from app.database import Account, Holding  # type: ignore

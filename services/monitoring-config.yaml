@@ -1,0 +1,205 @@
+# Production Monitoring Configuration
+# This file contains configuration for production monitoring and alerting
+
+monitoring:
+  # Metrics collection settings
+  metrics:
+    max_metrics: 100000  # Maximum number of metrics to store in memory
+    collection_interval: 60  # Seconds between system metric collection
+    retention_hours: 168  # 7 days of metric retention
+    
+  # Alert thresholds
+  alerts:
+    system:
+      cpu_percent: 80.0  # CPU usage threshold (%)
+      memory_percent: 85.0  # Memory usage threshold (%)
+      disk_percent: 90.0  # Disk usage threshold (%)
+      response_time_p95: 5.0  # 95th percentile response time (seconds)
+      error_rate: 0.05  # Error rate threshold (5%)
+      
+    application:
+      order_error_rate: 0.02  # Order operation error rate (2%)
+      alpaca_error_rate: 0.03  # Alpaca API error rate (3%)
+      database_error_rate: 0.01  # Database error rate (1%)
+      
+    business:
+      failed_orders_per_hour: 10  # Maximum failed orders per hour
+      rejected_orders_rate: 0.1  # Rejected orders rate (10%)
+      
+  # Notification settings
+  notifications:
+    # Slack webhook configuration
+    slack:
+      enabled: true
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channels:
+        critical: "#alerts-critical"
+        high: "#alerts-high"
+        medium: "#alerts-medium"
+        low: "#alerts-low"
+        
+    # Email notification configuration
+    email:
+      enabled: true
+      smtp_server: "${SMTP_SERVER}"
+      smtp_port: 587
+      smtp_username: "${SMTP_USERNAME}"
+      smtp_password: "${SMTP_PASSWORD}"
+      from_email: "alerts@valuepartner.ai"
+      to_emails:
+        - "devops@valuepartner.ai"
+        - "engineering@valuepartner.ai"
+        
+    # PagerDuty integration
+    pagerduty:
+      enabled: false
+      service_key: "${PAGERDUTY_SERVICE_KEY}"
+      
+  # Health check settings
+  health_checks:
+    endpoints:
+      - name: "database"
+        check_interval: 30  # seconds
+        timeout: 5  # seconds
+        
+      - name: "celery"
+        check_interval: 60  # seconds
+        timeout: 10  # seconds
+        
+      - name: "alpaca_api"
+        check_interval: 120  # seconds
+        timeout: 15  # seconds
+        
+      - name: "market_data"
+        check_interval: 60  # seconds
+        timeout: 10  # seconds
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "json"
+  
+  # Log rotation settings
+  rotation:
+    max_file_size: "100MB"
+    backup_count: 10
+    
+  # Log destinations
+  handlers:
+    - type: "file"
+      filename: "/var/log/valuepartner/app.log"
+      level: "INFO"
+      
+    - type: "file"
+      filename: "/var/log/valuepartner/errors.log"
+      level: "ERROR"
+      
+    - type: "syslog"
+      address: "localhost:514"
+      level: "WARNING"
+      
+    - type: "console"
+      level: "INFO"
+
+# Performance monitoring
+performance:
+  # Response time monitoring
+  response_time:
+    slow_request_threshold: 2.0  # seconds
+    very_slow_request_threshold: 5.0  # seconds
+    
+  # Database performance
+  database:
+    slow_query_threshold: 1.0  # seconds
+    connection_pool_size: 20
+    max_overflow: 30
+    
+  # Memory monitoring
+  memory:
+    gc_threshold: 0.7  # Trigger GC at 70% memory usage
+    memory_leak_detection: true
+    
+  # CPU monitoring
+  cpu:
+    high_cpu_duration: 300  # Alert after 5 minutes of high CPU
+    
+# Security monitoring
+security:
+  # Rate limiting
+  rate_limiting:
+    requests_per_minute: 100
+    burst_size: 20
+    
+  # Authentication monitoring
+  auth:
+    failed_login_threshold: 5  # Failed logins before alert
+    failed_login_window: 300  # 5 minute window
+    
+  # API security
+  api:
+    suspicious_patterns:
+      - "sql injection"
+      - "xss attempt"
+      - "path traversal"
+      
+# Backup and disaster recovery
+backup:
+  # Database backup monitoring
+  database:
+    backup_schedule: "0 2 * * *"  # Daily at 2 AM
+    backup_retention: 30  # days
+    backup_verification: true
+    
+  # Configuration backup
+  config:
+    backup_schedule: "0 3 * * *"  # Daily at 3 AM
+    backup_retention: 90  # days
+
+# Maintenance windows
+maintenance:
+  # Scheduled maintenance windows (no alerts)
+  windows:
+    - name: "weekly_maintenance"
+      schedule: "0 3 * * 0"  # Sunday 3 AM
+      duration: 120  # minutes
+      
+    - name: "monthly_updates"
+      schedule: "0 2 1 * *"  # 1st of month, 2 AM
+      duration: 240  # minutes
+
+# External service monitoring
+external_services:
+  # Third-party API monitoring
+  apis:
+    - name: "alpaca"
+      endpoint: "https://api.alpaca.markets/v2/account"
+      check_interval: 300  # 5 minutes
+      timeout: 30  # seconds
+      
+    - name: "plaid"
+      endpoint: "https://api.plaid.com/ping"
+      check_interval: 300  # 5 minutes
+      timeout: 30  # seconds
+      
+  # Market data feeds
+  market_data:
+    - name: "yahoo_finance"
+      check_interval: 300  # 5 minutes
+      timeout: 15  # seconds
+
+# Compliance and audit
+compliance:
+  # Audit log settings
+  audit_logs:
+    enabled: true
+    retention_days: 2555  # 7 years
+    
+  # SOX compliance monitoring
+  sox:
+    financial_transaction_logging: true
+    segregation_of_duties: true
+    
+  # GDPR compliance
+  gdpr:
+    data_processing_logging: true
+    consent_tracking: true

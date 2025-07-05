@@ -8,7 +8,7 @@ import logging
 from dataclasses import dataclass
 
 from .database import Base
-# # from .alpaca_service import AlpacaService # Removed for debugging # Removed for debugging
+from .alpaca_service import AlpacaService
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,17 @@ class OrderStatus(PyEnum):
     CANCELLED = "cancelled"
     REJECTED = "rejected"
     EXPIRED = "expired"
+
+# Valid state transitions for order management
+VALID_STATUS_TRANSITIONS = {
+    OrderStatus.PENDING: [OrderStatus.SUBMITTED, OrderStatus.CANCELLED, OrderStatus.REJECTED],
+    OrderStatus.SUBMITTED: [OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED, OrderStatus.EXPIRED],
+    OrderStatus.PARTIALLY_FILLED: [OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.EXPIRED],
+    OrderStatus.FILLED: [],  # Terminal state
+    OrderStatus.CANCELLED: [],  # Terminal state
+    OrderStatus.REJECTED: [],  # Terminal state
+    OrderStatus.EXPIRED: []  # Terminal state
+}
 
 class TimeInForce(PyEnum):
     DAY = "day"
@@ -132,7 +143,9 @@ class OrderManagementSystem:
     
     def __init__(self, db: Session):
         self.db = db
-        # self.alpaca_service = AlpacaService() # Removed for debugging
+        self.alpaca_service = AlpacaService()
+        self.max_retry_attempts = 3
+        self.retry_delay = 1  # seconds
         
     def create_order(self, user_id: int, order_request: OrderRequest, 
                     account_id: Optional[int] = None, 
@@ -178,32 +191,48 @@ class OrderManagementSystem:
             raise ValueError(f"Order {order_id} cannot be submitted (status: {order.status})")
             
         try:
-            # Simulate Alpaca order submission
-            broker_order = {
-                "id": "simulated_broker_id_" + str(order_id),
-                "status": "submitted",
-                "filled_qty": 0,
-                "filled_avg_price": 0,
-                "commission": 0,
-                "filled_at": None
-            }
-            logger.info(f"Simulated Alpaca order submission for order {order_id}")
-            logger.info(f"Simulated Alpaca order submission for order {order_id}")
-            
-            # Update order with broker information
-            order.broker_order_id = broker_order.get("id")
-            order.status = OrderStatus.SUBMITTED
-            order.submitted_at = datetime.utcnow()
-            order.broker_data = json.dumps(broker_order)
-            
-            self.db.commit()
+            # Submit order to Alpaca
+            if self.alpaca_service.is_connected():
+                broker_order = self.alpaca_service.submit_order(
+                    symbol=order.symbol,
+                    qty=float(order.quantity),
+                    side=order.side.value,
+                    order_type=order.order_type.value,
+                    time_in_force=order.time_in_force.value,
+                    limit_price=float(order.limit_price) if order.limit_price else None,
+                    stop_price=float(order.stop_price) if order.stop_price else None,
+                    trail_percent=float(order.trail_percent) if order.trail_percent else None,
+                    trail_price=float(order.trail_price) if order.trail_price else None,
+                    extended_hours=order.extended_hours,
+                    client_order_id=order.client_order_id
+                )
+                
+                # Update order with broker information using safe status transition
+                order.broker_order_id = broker_order.get("id")
+                self._update_order_status_safe(order, OrderStatus.SUBMITTED, broker_order)
+                
+                logger.info(f"Successfully submitted order {order_id} to Alpaca: {broker_order.get('id')}")
+            else:
+                # Fallback to simulation if Alpaca is not connected
+                broker_order = {
+                    "id": "simulated_broker_id_" + str(order_id),
+                    "status": "submitted",
+                    "filled_qty": 0,
+                    "filled_avg_price": 0,
+                    "commission": 0,
+                    "filled_at": None
+                }
+                logger.warning(f"Alpaca not connected, simulating order submission for order {order_id}")
+                
+                # Update order with simulated broker information using safe status transition
+                order.broker_order_id = broker_order.get("id")
+                self._update_order_status_safe(order, OrderStatus.SUBMITTED, broker_order)
             
             logger.info(f"Submitted order {order_id} to broker")
             return True
             
         except Exception as e:
-            order.status = OrderStatus.REJECTED
-            self.db.commit()
+            self._update_order_status_safe(order, OrderStatus.REJECTED, {"error": str(e), "timestamp": datetime.utcnow().isoformat()})
             logger.error(f"Failed to submit order {order_id}: {e}")
             return False
             
@@ -218,21 +247,25 @@ class OrderManagementSystem:
             raise ValueError(f"Order {order_id} cannot be cancelled (status: {order.status})")
             
         try:
-            # Simulate broker cancellation
+            # Cancel order with broker
             if order.broker_order_id:
-                logger.info(f"Simulated Alpaca order cancellation for order {order.broker_order_id}")
-                success = True # Simulate success
-                if not success:
-                    return False
+                if self.alpaca_service.is_connected():
+                    success = self.alpaca_service.cancel_order(order.broker_order_id)
+                    if not success:
+                        logger.error(f"Failed to cancel order {order.broker_order_id} with Alpaca")
+                        return False
+                    logger.info(f"Successfully cancelled order {order.broker_order_id} with Alpaca")
+                else:
+                    logger.warning(f"Alpaca not connected, simulating order cancellation for order {order.broker_order_id}")
+                    success = True
                     
-            # Update order status
-            order.status = OrderStatus.CANCELLED
-            order.updated_at = datetime.utcnow()
-            
-            self.db.commit()
-            
-            logger.info(f"Cancelled order {order_id}")
-            return True
+            # Update order status using safe transition
+            if self._update_order_status_safe(order, OrderStatus.CANCELLED):
+                logger.info(f"Cancelled order {order_id}")
+                return True
+            else:
+                logger.error(f"Failed to update status to cancelled for order {order_id}")
+                return False
             
         except Exception as e:
             logger.error(f"Failed to cancel order {order_id}: {e}")
@@ -308,6 +341,158 @@ class OrderManagementSystem:
                 logger.error(f"Failed to update order {order.id}: {e}")
                 
         return updated_count
+    
+    def _validate_status_transition(self, current_status: OrderStatus, new_status: OrderStatus) -> bool:
+        """Validate if status transition is allowed"""
+        valid_transitions = VALID_STATUS_TRANSITIONS.get(current_status, [])
+        return new_status in valid_transitions
+    
+    def _update_order_status_safe(self, order: Order, new_status: OrderStatus, 
+                                  broker_data: Optional[Dict] = None) -> bool:
+        """Safely update order status with validation"""
+        if not self._validate_status_transition(order.status, new_status):
+            logger.warning(f"Invalid status transition from {order.status} to {new_status} for order {order.id}")
+            return False
+        
+        old_status = order.status
+        order.status = new_status
+        order.updated_at = datetime.utcnow()
+        
+        if broker_data:
+            order.broker_data = json.dumps(broker_data)
+        
+        # Set specific timestamps based on new status
+        if new_status == OrderStatus.SUBMITTED and not order.submitted_at:
+            order.submitted_at = datetime.utcnow()
+        elif new_status == OrderStatus.FILLED and not order.filled_at:
+            order.filled_at = datetime.utcnow()
+        
+        self.db.commit()
+        logger.info(f"Order {order.id} status updated from {old_status} to {new_status}")
+        return True
+    
+    def retry_failed_orders(self, user_id: int, max_age_hours: int = 24) -> int:
+        """Retry orders that failed due to temporary issues"""
+        cutoff_time = datetime.utcnow() - timedelta(hours=max_age_hours)
+        
+        failed_orders = self.db.query(Order).filter(
+            Order.user_id == user_id,
+            Order.status.in_([OrderStatus.REJECTED, OrderStatus.EXPIRED]),
+            Order.created_at >= cutoff_time,
+            Order.broker_data.like('%"temporary"%')  # Only retry temporary failures
+        ).all()
+        
+        retry_count = 0
+        for order in failed_orders:
+            try:
+                # Reset to pending status for retry
+                if self._update_order_status_safe(order, OrderStatus.PENDING):
+                    # Clear broker data for fresh submission
+                    order.broker_order_id = None
+                    order.broker_data = None
+                    self.db.commit()
+                    
+                    # Attempt resubmission
+                    if self.submit_order(order.id):
+                        retry_count += 1
+                        logger.info(f"Successfully retried order {order.id}")
+                    else:
+                        logger.warning(f"Retry failed for order {order.id}")
+                        
+            except Exception as e:
+                logger.error(f"Error retrying order {order.id}: {e}")
+        
+        return retry_count
+    
+    def expire_day_orders(self) -> int:
+        """Expire day orders at market close"""
+        # Get orders that should be expired (DAY orders that are still active)
+        active_day_orders = self.db.query(Order).filter(
+            Order.time_in_force == TimeInForce.DAY,
+            Order.status.in_([OrderStatus.PENDING, OrderStatus.SUBMITTED, OrderStatus.PARTIALLY_FILLED]),
+            Order.created_at < datetime.utcnow().replace(hour=20, minute=0, second=0, microsecond=0)  # After 8 PM UTC (market close)
+        ).all()
+        
+        expired_count = 0
+        for order in active_day_orders:
+            try:
+                # Try to cancel with broker first
+                if order.broker_order_id and self.alpaca_service.is_connected():
+                    self.alpaca_service.cancel_order(order.broker_order_id)
+                
+                # Update status to expired
+                if self._update_order_status_safe(order, OrderStatus.EXPIRED):
+                    expired_count += 1
+                    logger.info(f"Expired day order {order.id}")
+                    
+            except Exception as e:
+                logger.error(f"Error expiring order {order.id}: {e}")
+        
+        return expired_count
+    
+    def get_order_statistics(self, user_id: int, days: int = 30) -> Dict:
+        """Get comprehensive order statistics"""
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        orders = self.db.query(Order).filter(
+            Order.user_id == user_id,
+            Order.created_at >= start_date
+        ).all()
+        
+        if not orders:
+            return {
+                "total_orders": 0,
+                "period_days": days,
+                "status_breakdown": {},
+                "fill_rate": 0,
+                "average_fill_time": None,
+                "total_commission": 0,
+                "total_volume": 0,
+                "success_rate": 0
+            }
+        
+        # Status breakdown
+        status_counts = {}
+        for status in OrderStatus:
+            status_counts[status.value] = len([o for o in orders if o.status == status])
+        
+        # Fill rate calculation
+        filled_orders = [o for o in orders if o.status == OrderStatus.FILLED]
+        total_orders = len(orders)
+        fill_rate = (len(filled_orders) / total_orders * 100) if total_orders > 0 else 0
+        
+        # Average fill time (for filled orders)
+        fill_times = []
+        for order in filled_orders:
+            if order.submitted_at and order.filled_at:
+                fill_time = (order.filled_at - order.submitted_at).total_seconds()
+                fill_times.append(fill_time)
+        
+        avg_fill_time = sum(fill_times) / len(fill_times) if fill_times else None
+        
+        # Commission and volume
+        total_commission = sum(o.commission for o in orders if o.commission)
+        total_volume = sum(float(o.quantity) * float(o.average_fill_price or 0) for o in filled_orders)
+        
+        # Success rate (submitted orders that didn't get rejected)
+        submitted_orders = [o for o in orders if o.status != OrderStatus.PENDING]
+        rejected_orders = [o for o in orders if o.status == OrderStatus.REJECTED]
+        success_rate = ((len(submitted_orders) - len(rejected_orders)) / len(submitted_orders) * 100) if submitted_orders else 0
+        
+        return {
+            "total_orders": total_orders,
+            "period_days": days,
+            "status_breakdown": status_counts,
+            "fill_rate": fill_rate,
+            "average_fill_time_seconds": avg_fill_time,
+            "total_commission": float(total_commission),
+            "total_volume": total_volume,
+            "success_rate": success_rate,
+            "filled_orders": len(filled_orders),
+            "rejected_orders": len(rejected_orders),
+            "expired_orders": status_counts.get("expired", 0),
+            "cancelled_orders": status_counts.get("cancelled", 0)
+        }
         
     def _validate_order_request(self, order_request: OrderRequest):
         """Validate order request"""

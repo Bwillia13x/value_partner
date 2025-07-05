@@ -22,6 +22,9 @@ from app.market_data_routes import router as market_data_router
 from app.integrations.plaid_routes import router as plaid_router
 # from app.task_routes import router as task_router # Removed for debugging
 from app.unified_account_routes import router as unified_account_router
+from app.monitoring_routes import router as monitoring_router
+from app.websocket_routes import router as websocket_router
+from app.beta_testing_routes import router as beta_router
 from app.database import init_db
 from celery import current_app as current_celery_app
 from pathlib import Path
@@ -31,6 +34,8 @@ from datetime import datetime
 from app.logging_config import setup_logging
 from app.performance_monitor import performance_monitor
 from app.csrf_protection import CSRFProtectionMiddleware
+from app.monitoring import start_monitoring, track_http_request, app_monitor
+from app.real_time_sync import start_real_time_sync
 
 # Initialize structured logging
 logger = setup_logging()
@@ -57,12 +62,15 @@ app = FastAPI(
     on_shutdown=[]
 )
 
-# Add request tracing middleware
+# Add request tracing and monitoring middleware
 @app.middleware("http")
 async def request_tracing_middleware(request: Request, call_next):
-    """Add request tracing and correlation ID to all requests"""
+    """Add request tracing, correlation ID, and monitoring to all requests"""
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
+    
+    # Skip monitoring for monitoring endpoints to avoid circular metrics
+    skip_monitoring = request.url.path.startswith("/monitoring/") or request.url.path == "/health"
     
     # Log request start
     logger.info(f"Request started: {request.method} {request.url.path}", extra={
@@ -72,24 +80,50 @@ async def request_tracing_middleware(request: Request, call_next):
         "client_ip": request.client.host if request.client else "unknown"
     })
     
-    try:
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        
-        # Log successful response
-        logger.info(f"Request completed: {response.status_code}", extra={
-            "request_id": request_id,
-            "status_code": response.status_code
-        })
-        
-        return response
-    except Exception as e:
-        # Log error
-        logger.error(f"Request failed: {str(e)}", extra={
-            "request_id": request_id,
-            "error": str(e)
-        })
-        raise
+    # Track request with monitoring system
+    if not skip_monitoring:
+        with track_http_request(request.url.path, request.method) as tracker:
+            try:
+                response = await call_next(request)
+                response.headers["X-Request-ID"] = request_id
+                
+                # Set status code for tracking
+                tracker.set_status_code(response.status_code)
+                
+                # Log successful response
+                logger.info(f"Request completed: {response.status_code}", extra={
+                    "request_id": request_id,
+                    "status_code": response.status_code
+                })
+                
+                return response
+            except Exception as e:
+                # Log error
+                logger.error(f"Request failed: {str(e)}", extra={
+                    "request_id": request_id,
+                    "error": str(e)
+                })
+                raise
+    else:
+        # Skip monitoring for internal endpoints
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            
+            # Log successful response
+            logger.info(f"Request completed: {response.status_code}", extra={
+                "request_id": request_id,
+                "status_code": response.status_code
+            })
+            
+            return response
+        except Exception as e:
+            # Log error
+            logger.error(f"Request failed: {str(e)}", extra={
+                "request_id": request_id,
+                "error": str(e)
+            })
+            raise
 
 # Add CORS middleware
 from fastapi.middleware.cors import CORSMiddleware
@@ -123,6 +157,14 @@ def create_celery():
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on application startup"""
+    # Start monitoring system
+    start_monitoring()
+    logger.info("Monitoring system started")
+    
+    # Start real-time sync manager
+    start_real_time_sync()
+    logger.info("Real-time sync manager started")
+    
     # Ensure the Celery app is properly configured
     create_celery()
     logger.info("Application startup: Celery worker initialized")
@@ -147,7 +189,19 @@ async def startup_event():
 @app.get("/health", include_in_schema=False)
 async def health_check():
     """Basic health check endpoint"""
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    # Use the monitoring system for health check
+    health_status = app_monitor.get_health_status()
+    
+    # Return appropriate HTTP status based on health
+    if health_status["status"] == "unhealthy":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=health_status
+        )
+    elif health_status["status"] == "degraded":
+        return {"status": "degraded", **health_status}
+    else:
+        return {"status": "healthy", **health_status}
 
 @app.get("/health/detailed", include_in_schema=False)
 async def detailed_health_check():
@@ -276,6 +330,9 @@ app.include_router(market_data_router)
 app.include_router(plaid_router)
 # app.include_router(task_router) # Removed for debugging
 app.include_router(unified_account_router)
+app.include_router(monitoring_router)
+app.include_router(websocket_router)
+app.include_router(beta_router)
 
 
 

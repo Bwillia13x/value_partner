@@ -80,3 +80,24 @@ WHERE users.email = ?
 2025-07-04 17:28:07,148 - services.app - ERROR - Error message
 2025-07-04 17:30:24,792 - services.app - ERROR - Error message
 2025-07-04 17:31:18,562 - services.app - ERROR - Error message
+2025-07-04 20:27:47,632 - services.app - ERROR - Error message
+2025-07-04 20:43:11,540 - services.app - ERROR - Error message
+2025-07-04 20:45:09,472 - services.app - ERROR - Error message
+2025-07-04 21:01:55,578 - services.app - ERROR - Error message
+2025-07-04 21:13:33,839 - services.app - ERROR - Error message
+2025-07-04 21:22:47,794 - services.app - ERROR - Error message
+2025-07-04 21:29:43,451 - services.app - ERROR - Error message
+2025-07-04 21:29:45,888 - services.app.alpaca_service - ERROR - Alpaca connection check failed: Connection failed
+2025-07-04 21:29:45,912 - services.app.alpaca_service - ERROR - Alpaca API error canceling order: Cancel failed
+2025-07-04 21:29:45,923 - services.app.alpaca_service - ERROR - Alpaca API error submitting order: Order failed
+2025-07-04 21:29:45,923 - services.app.alpaca_service - ERROR - Failed to execute trade: 400: Order failed
+2025-07-04 21:37:31,813 - services.app - ERROR - Error message
+2025-07-04 21:37:33,735 - services.app.alpaca_service - ERROR - Alpaca connection check failed: Connection failed
+2025-07-04 21:37:33,748 - services.app.alpaca_service - ERROR - Alpaca API error canceling order: Cancel failed
+2025-07-04 21:37:33,753 - services.app.alpaca_service - ERROR - Alpaca API error submitting order: Order failed
+2025-07-04 21:37:33,753 - services.app.alpaca_service - ERROR - Failed to execute trade: 400: Order failed
+2025-07-04 21:43:03,165 - services.app - ERROR - Error message
+2025-07-04 21:43:07,218 - services.app.alpaca_service - ERROR - Alpaca connection check failed: Connection failed
+2025-07-04 21:43:07,309 - services.app.alpaca_service - ERROR - Alpaca API error canceling order: Cancel failed
+2025-07-04 21:43:07,322 - services.app.alpaca_service - ERROR - Alpaca API error submitting order: Order failed
+2025-07-04 21:43:07,323 - services.app.alpaca_service - ERROR - Failed to execute trade: 400: Order failed
